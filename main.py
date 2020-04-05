@@ -1,3 +1,8 @@
+from datetime import datetime
+import numpy as np
+
+from torch.utils.tensorboard import SummaryWriter
+
 from preparations import load_and_prepare_data, make_augmentation, normalize_and_vectorize, split_data
 from random_forest import RFClassifier
 from torch_net import TorchNetClassifier
@@ -18,14 +23,21 @@ if __name__ == '__main__':
     names_array = [*base_columns_names, *['t{}'.format(i + 1) for i in range(60000)]]
 
     raw_data = load_and_prepare_data(filename, names_array)
+    current_time = datetime.now().strftime("%d_%m_%Y-%H_%M_%S")
     models = [
         {
             'name': 'Torch neural network',
-            'classifier': TorchNetClassifier(attrs_count=abductions_count * needed_per_abduction + 2, classes_count=9),
+            'classifier': TorchNetClassifier(
+                attrs_count=abductions_count * needed_per_abduction + 2, classes_count=9, batch_size=1000
+            ),
+            'writer': SummaryWriter(f'./logs/torch_net_{current_time}'),
+            'batch_size': 1000,
         },
         {
             'name': 'Random forest',
-            'classifier': RFClassifier(estimators_number=110),
+            'classifier': RFClassifier(estimators_number=110, batch_size=1000),
+            'writer': SummaryWriter(f'./logs/rf_{current_time}'),
+            'batch_size': 1000,
         },
     ]
 
@@ -36,6 +48,8 @@ if __name__ == '__main__':
 
         train_x = splitted_data['train_set']['x']
         train_y = splitted_data['train_set']['y']
+        train_size = splitted_data['train_set']['size']
+
         test_x = splitted_data['test_set']['x']
         test_y = splitted_data['test_set']['y']
 
@@ -44,7 +58,20 @@ if __name__ == '__main__':
             name = model['name']
             classifier = model['classifier']
 
-            train_error = classifier.fit(train_x, train_y)
-            test_error = classifier.check(test_x, test_y)
+            batches_count = int(np.ceil(train_size / model['batch_size']))
 
-            print(f'Name: {name}; Train error: {train_error}; Test error: {test_error}')
+            def lr_logger(x, y): model['writer'].add_scalar('Train/LR', y, x + epoch * batches_count)
+
+            def loss_logger(x, y): model['writer'].add_scalar('Train/Loss', y, x + epoch * batches_count)
+
+            train_error, train_loss = classifier.fit(train_x, train_y, lr_logger, loss_logger)
+            test_error, test_loss = classifier.check(test_x, test_y)
+
+            model['writer'].add_scalar('Train/Error', train_error, epoch)
+            model['writer'].add_scalar('Test/Error', test_error, epoch)
+            model['writer'].add_scalar('Test/Loss', test_loss, epoch)
+
+            print(f'[Name: {name}]; '
+                  f'[Train: error - {train_error}; loss - {train_loss}]; '
+                  f'[Test: error - {test_error}; loss - {test_loss}'
+            )

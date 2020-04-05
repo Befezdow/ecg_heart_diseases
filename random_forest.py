@@ -8,7 +8,7 @@ class RFClassifier:
 
         self.batch_size = batch_size
 
-    def fit(self, x_train, y_train):
+    def fit(self, x_train, y_train, lr_logger=None, loss_logger=None):
         batch_size = self.batch_size
         dataset_size = x_train.shape[0]
         batches_count = int(np.ceil(dataset_size / batch_size))
@@ -18,21 +18,21 @@ class RFClassifier:
             y_var = y_train.iloc[batch_index * batch_size:batch_index * batch_size + batch_size]
             self.model.fit(x_var, y_var)
 
-        return np.mean(self.model.predict(x_train) != y_train)
+        return np.mean(self.model.predict(x_train) != y_train), 0
 
     def check(self, x, y):
         batch_size = self.batch_size
         dataset_size = x.shape[0]
         batches_count = int(np.ceil(dataset_size / batch_size))
 
-        loss = 0
+        error = 0
         for batch_index in range(batches_count):
             x_var = x.iloc[batch_index * batch_size:batch_index * batch_size + batch_size, :]
             y_var = y.iloc[batch_index * batch_size:batch_index * batch_size + batch_size]
-            loss += np.mean(self.model.predict(x_var) != y_var)
+            error += np.mean(self.model.predict(x_var) != y_var)
 
-        loss /= batches_count
-        return loss
+        error /= batches_count
+        return error, 0
 
     def predict(self, x):
         return self.model.predict(x)

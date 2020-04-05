@@ -68,9 +68,11 @@ def split_data(data, class_column, test_set_size, random_state):
         'train_set': {
             'x': x_train,
             'y': y_train,
+            'size': len(x_train),
         },
         'test_set': {
             'x': x_test,
             'y': y_test,
+            'size': len(x_test),
         },
     }

@@ -27,9 +27,11 @@ class TorchNetClassifier:
         # Создаем функцию потерь
         self.criterion = torch.nn.NLLLoss()
 
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=2, gamma=0.1)
+
         self.batch_size = batch_size
 
-    def fit(self, x_train, y_train):
+    def fit(self, x_train, y_train, lr_logger=None, loss_logger=None):
         x_tensor = torch.Tensor(x_train.to_numpy().astype(np.float32))
         y_tensor = torch.Tensor(y_train.to_numpy()).long() - 1
 
@@ -38,6 +40,7 @@ class TorchNetClassifier:
         batches_count = int(np.ceil(dataset_size / batch_size))
 
         correct = 0
+        summary_loss = 0
         for batch_index in range(batches_count):
             x_var = Variable(x_tensor[batch_index * batch_size:batch_index * batch_size + batch_size])
             y_var = Variable(y_tensor[batch_index * batch_size:batch_index * batch_size + batch_size])
@@ -46,13 +49,24 @@ class TorchNetClassifier:
             net_out = self.model(x_var.double())
             loss = self.criterion(net_out, y_var)
 
-            pred = net_out.data.max(1)[1]  # получаем индекс максимального значения
-            correct += pred.eq(y_var.data).sum()
+            _, pred = net_out.data.max(1)  # получаем индекс максимального значения
 
             loss.backward()
             self.optimizer.step()
 
-        return 1 - correct.item() / dataset_size
+            correct += pred.eq(y_var.data).sum()
+            summary_loss += loss.item()
+
+            if lr_logger is not None:
+                lr_value = self.scheduler.get_lr()[0]
+                lr_logger(batch_index, lr_value)
+
+            if loss_logger is not None:
+                loss_value = loss.item()
+                loss_logger(batch_index, loss_value)
+
+        self.scheduler.step()
+        return 1 - correct.item() / dataset_size, summary_loss / dataset_size
 
     def check(self, x, y):
         x_tensor = torch.Tensor(x.to_numpy().astype(np.float32))
@@ -63,16 +77,19 @@ class TorchNetClassifier:
         batches_count = int(np.ceil(dataset_size / batch_size))
 
         correct = 0
+        summary_loss = 0
         for batch_index in range(batches_count):
             x_var = Variable(x_tensor[batch_index * batch_size:batch_index * batch_size + batch_size])
             y_var = Variable(y_tensor[batch_index * batch_size:batch_index * batch_size + batch_size])
 
             net_out = self.model(x_var.double())
+            loss = self.criterion(net_out, y_var)
 
-            pred = net_out.data.max(1)[1]  # получаем индекс максимального значения
+            _, pred = net_out.data.max(1)  # получаем индекс максимального значения
             correct += pred.eq(y_var.data).sum()
+            summary_loss += loss.item()
 
-        return 1 - correct.item() / dataset_size
+        return 1 - correct.item() / dataset_size, summary_loss / dataset_size
 
     def predict(self, x):
         x_tensor = torch.Tensor(x.to_numpy())
