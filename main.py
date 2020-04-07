@@ -15,7 +15,7 @@ test_set_size = 0.3
 random_state = 3
 
 if __name__ == '__main__':
-    filename = 'N:\\Nova\\preview.csv'
+    filename = 'N:\\Nova\\half.csv'
 
     class_column_name = 'class1'
     excess_column_names = ['class2', 'class3']

@@ -23,11 +23,11 @@ class TorchNetClassifier:
         # Инициализируем нейронную сеть
         self.model = Net(attrs_count, classes_count).double()
         # Создаем оптимизатор
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.model.parameters())
         # Создаем функцию потерь
         self.criterion = torch.nn.NLLLoss()
 
-        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=2, gamma=0.1)
+        self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=10, gamma=0.1)
 
         self.batch_size = batch_size
 
