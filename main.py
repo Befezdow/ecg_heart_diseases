@@ -8,9 +8,9 @@ from random_forest import RFClassifier
 from torch_net import TorchNetClassifier
 
 epoch_number = 10
-multiplier = 2
+multiplier = 20
 abductions_count = 12
-needed_per_abduction = 2500
+needed_per_abduction = 1000
 test_set_size = 0.3
 random_state = 3
 
