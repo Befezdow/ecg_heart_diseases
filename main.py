@@ -7,7 +7,7 @@ from preparations import load_and_prepare_data, make_augmentation, normalize_and
 from random_forest import RFClassifier
 from torch_net import TorchNetClassifier
 
-epoch_number = 10
+epoch_number = 30
 multiplier = 20
 abductions_count = 12
 needed_per_abduction = 1000
@@ -33,12 +33,12 @@ if __name__ == '__main__':
             'writer': SummaryWriter(f'./logs/torch_net_{current_time}'),
             'batch_size': 1000,
         },
-        {
-            'name': 'Random forest',
-            'classifier': RFClassifier(estimators_number=110, batch_size=1000),
-            'writer': SummaryWriter(f'./logs/rf_{current_time}'),
-            'batch_size': 1000,
-        },
+        # {
+        #     'name': 'Random forest',
+        #     'classifier': RFClassifier(estimators_number=110, batch_size=1000),
+        #     'writer': SummaryWriter(f'./logs/rf_{current_time}'),
+        #     'batch_size': 1000,
+        # },
     ]
 
     for epoch in range(epoch_number):
