@@ -4,18 +4,19 @@ import numpy as np
 from torch.utils.tensorboard import SummaryWriter
 
 from preparations import load_and_prepare_data, make_augmentation, normalize_and_vectorize, split_data
-from random_forest import RFClassifier
 from torch_net import TorchNetClassifier
 
+# TODO move it to the config
 epoch_number = 30
 multiplier = 20
 abductions_count = 12
 needed_per_abduction = 1000
 test_set_size = 0.3
 random_state = 3
+dataset_file = 'N:\\Nova\\half.csv'
 
 if __name__ == '__main__':
-    filename = 'N:\\Nova\\half.csv'
+    filename = dataset_file
 
     class_column_name = 'class1'
     excess_column_names = ['class2', 'class3']
