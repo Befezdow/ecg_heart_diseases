@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import torchvision.transforms.functional as F
 
 
 class CutOff(object):
@@ -15,4 +14,4 @@ class CutOff(object):
 class ToTensor(object):
     def __call__(self, sample):
         (gender, age, data), marks = sample
-        return (torch.tensor([gender, age]), F.to_tensor(data)), marks
+        return (torch.tensor([gender, age]), torch.from_numpy(data)), marks

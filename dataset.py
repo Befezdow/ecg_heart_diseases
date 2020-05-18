@@ -48,6 +48,9 @@ class EcgDataset(Dataset):
         age = raw_data['ECG'][0][0][1][0][0]
         data = raw_data['ECG'][0][0][2].astype('Float32')
 
+        if age == np.nan or math.isnan(age):
+            age = 60    # average
+
         borders = self.augment_borders[interval_number]
         data = data[:, borders[0]:borders[1]]
 
@@ -153,3 +156,63 @@ def check_gender_age_stats(csv_file, root_dir):
     print(f'Average age: {avg_age}')
     print(f'Empty age count: {empty_age_count}')
     print(f'Negative age count: {negative_age_count}')
+
+
+def get_mean_deviation(csv_file, root_dir, intervals):
+    marks_frame = pd.read_csv(csv_file)
+
+    total_age_mean = 0
+    total_age_deviation = 0
+    total_data_mean = 0
+    total_data_deviation = 0
+
+    intervals_count = len(intervals)
+    dataset_size = len(marks_frame)
+    for i in range(0, dataset_size):
+        mark_name = marks_frame.iloc[i, 0]
+        short_data_filename = mark_name + '.mat'
+        full_data_filename = os.path.join(root_dir, short_data_filename)
+        raw_data = sio.loadmat(full_data_filename)
+
+        age = raw_data['ECG'][0][0][1][0][0]
+        data = raw_data['ECG'][0][0][2].astype('Float32')
+
+        if not (age == np.nan or math.isnan(age)):
+            total_age_mean += age / dataset_size
+
+        temp = 0
+        stopped = False
+        for (left_border, right_border) in intervals:
+            if right_border > data.shape[1]:
+                stopped = True
+                break
+            temp += data[:, left_border:right_border]
+        if not stopped:
+            total_data_mean += temp / dataset_size * intervals_count
+
+    for i in range(0, dataset_size):
+        mark_name = marks_frame.iloc[i, 0]
+        short_data_filename = mark_name + '.mat'
+        full_data_filename = os.path.join(root_dir, short_data_filename)
+        raw_data = sio.loadmat(full_data_filename)
+
+        age = raw_data['ECG'][0][0][1][0][0]
+        data = raw_data['ECG'][0][0][2].astype('Float32')
+
+        if not (age == np.nan or math.isnan(age)):
+            total_age_deviation += intervals_count * (age - total_age_mean) ** 2 / (dataset_size * intervals_count - 1)
+
+        temp = 0
+        stopped = False
+        for (left_border, right_border) in intervals:
+            if right_border > data.shape[1]:
+                stopped = True
+                break
+            temp += (data[:, left_border:right_border] - total_data_mean) ** 2
+        if not stopped:
+            total_data_deviation += temp / (dataset_size * intervals_count - 1)
+
+    total_age_deviation = math.sqrt(total_age_deviation)
+    total_data_deviation = np.sqrt(total_data_deviation)
+
+    return (total_age_mean, total_age_deviation), (total_data_mean, total_data_deviation)

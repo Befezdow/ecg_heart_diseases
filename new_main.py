@@ -10,7 +10,7 @@ from joblib import dump
 
 from classifiers import ConvNN
 from data_manager import DataManager
-from dataset import check_classes_balance, check_gender_age_stats
+from dataset import check_classes_balance, check_gender_age_stats, get_mean_deviation
 
 
 def log_statistics(writer, epoch_number, index, dataset_size, train_loss, train_accuracy, test_loss, test_accuracy):
@@ -39,7 +39,7 @@ def train_net(model, data_manager, epochs=20):
                 if torch.cuda.is_available():
                     test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
 
-                test_out = _model(test_x2)
+                test_out = _model(test_x1, test_x2)
                 test_loss = _criterion(test_out, test_y)
                 _, test_pred = torch.max(test_out.data, 1)
 
@@ -73,7 +73,7 @@ def train_net(model, data_manager, epochs=20):
 
             optimizer.zero_grad()
 
-            train_out = model(train_x2)
+            train_out = model(train_x1, train_x2)
             train_loss = criterion(train_out, train_y)
             _, train_pred = torch.max(train_out.data, 1)
 
@@ -94,11 +94,14 @@ def main():
     marks_csv = 'data/REFERENCE.csv'
     train_dir = 'data/train'
     print('Classes balance:', check_classes_balance(marks_csv))
-    check_gender_age_stats(marks_csv, train_dir)
+    # check_gender_age_stats(marks_csv, train_dir)
+    # age_info, data_info = get_mean_deviation(marks_csv, train_dir, intervals=[(1000, 3500)])
+    # print(age_info)
+    # print(data_info)
 
-    # data_manager = DataManager(marks_csv, train_dir, batch_size=128)
-    # conv_nn = ConvNN()
-    # train_net(conv_nn, data_manager)
+    data_manager = DataManager(marks_csv, train_dir, batch_size=128, augment_multiplier=10)
+    conv_nn = ConvNN()
+    train_net(conv_nn, data_manager)
 
 
 if __name__ == '__main__':
