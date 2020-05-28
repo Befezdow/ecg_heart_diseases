@@ -44,3 +44,36 @@ class ConvNN(nn.Module):
         x = self.dropout25(x)
         x = F.log_softmax(self.fc3(x), dim=1)
         return x
+
+
+class FullyConnectedNN(nn.Module):
+    def __init__(self, hidden_layers_size=1000):
+        super(FullyConnectedNN, self).__init__()
+
+        self.flat_size = 30000
+        self.feed_forward_input_size = 30000 + 2
+
+        self.fc1 = nn.Linear(self.feed_forward_input_size, hidden_layers_size)
+        self.fc2 = nn.Linear(hidden_layers_size, hidden_layers_size)
+        self.fc3 = nn.Linear(hidden_layers_size, hidden_layers_size)
+        self.fc4 = nn.Linear(hidden_layers_size, 9)
+
+        self.batchNorm = nn.BatchNorm1d(num_features=12)
+
+        # dropouts
+        self.dropout50 = nn.Dropout(0.5)
+        self.dropout25 = nn.Dropout(0.25)
+
+    def forward(self, x1, x2):
+        x2 = self.batchNorm(x2)
+        x2 = x2.view(-1, self.flat_size)
+        x = torch.cat([x1.float(), x2], 1)
+
+        x = F.relu(self.fc1(x))
+        x = self.dropout50(x)
+        x = F.relu(self.fc2(x))
+        x = self.dropout25(x)
+        x = F.relu(self.fc3(x))
+        x = F.log_softmax(self.fc4(x), dim=1)
+
+        return x
