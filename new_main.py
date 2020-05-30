@@ -8,7 +8,7 @@ from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 from joblib import dump
 
-from classifiers import ConvNN
+from classifiers import ConvNN, FullyConnectedNN
 from data_manager import DataManager
 from dataset import check_classes_balance, check_gender_age_stats, get_mean_deviation
 
@@ -59,7 +59,7 @@ def train_net(model, data_manager, epochs=20):
         model.cuda()
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters())
+    optimizer = optim.Adam(model.parameters(), weight_decay=1e-4)
     train_loader, test_loader = data_manager.get_cnn_train_test_loaders()
     print(f'Train dataset size: {len(train_loader.dataset)}; Test dataset size: {len(test_loader.dataset)}')
 
@@ -99,8 +99,9 @@ def main():
     # print(age_info)
     # print(data_info)
 
-    data_manager = DataManager(marks_csv, train_dir, batch_size=128, augment_multiplier=10)
-    conv_nn = ConvNN()
+    data_manager = DataManager(marks_csv, train_dir, batch_size=2048, augment_multiplier=10)
+    # conv_nn = ConvNN()
+    conv_nn = FullyConnectedNN(500)
     train_net(conv_nn, data_manager)
 
 
