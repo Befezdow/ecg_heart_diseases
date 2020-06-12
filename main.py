@@ -1,78 +1,109 @@
-from datetime import datetime
+import torch
+import datetime
 import numpy as np
-
 from torch.utils.tensorboard import SummaryWriter
+import torch.nn as nn
+import torch.optim as optim
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score
+from joblib import dump
 
-from preparations import load_and_prepare_data, make_augmentation, normalize_and_vectorize, split_data
-from torch_net import TorchNetClassifier
+from classifiers import ConvNN, FullyConnectedNN
+from data_manager import DataManager
+from dataset import check_classes_balance, check_gender_age_stats, get_mean_deviation
 
-# TODO move it to the config
-epoch_number = 30
-multiplier = 20
-abductions_count = 12
-needed_per_abduction = 1000
-test_set_size = 0.3
-random_state = 3
-dataset_file = 'N:\\Nova\\half.csv'
+
+def log_statistics(writer, epoch_number, index, dataset_size, train_loss, train_accuracy, test_loss, test_accuracy):
+    print(
+        f'[TIME]: Epoch: {epoch_number}, Index: {index} \n'
+        f'[TRAIN]: Loss: {train_loss} , Accuracy: {train_accuracy} \n'
+        f'[TEST]: Loss: {test_loss} , Accuracy: {test_accuracy} \n'
+        f'-----------------------------------------\n'
+    )
+
+    position = epoch_number * dataset_size + index
+    writer.add_scalar('Train/Loss', train_loss, position)
+    writer.add_scalar('Train/Acc', train_accuracy, position)
+    writer.add_scalar('Test/Loss', test_loss, position)
+    writer.add_scalar('Test/Acc', test_accuracy, position)
+
+
+def train_net(model, data_manager, epochs=20):
+    def test_net(_model, _criterion, _loader):
+        _model.eval()
+
+        with torch.no_grad():
+            test_loss = 0
+            test_accuracy = 0
+            for [test_x1, test_x2], test_y in _loader:
+                if torch.cuda.is_available():
+                    test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
+
+                test_out = _model(test_x1, test_x2)
+                test_loss = _criterion(test_out, test_y)
+                _, test_pred = torch.max(test_out.data, 1)
+
+                test_loss += test_loss.item()
+                test_accuracy += test_pred.eq(test_y).sum().item() / test_y.size(0)
+
+            test_dataset_size = len(_loader)
+            test_loss /= test_dataset_size
+            test_accuracy /= test_dataset_size
+
+        _model.train()
+        return test_loss, test_accuracy
+
+    writer = SummaryWriter(f'./logs/ConvNN-{datetime.datetime.now()}')
+
+    if torch.cuda.is_available():
+        model.cuda()
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), weight_decay=1e-4)
+    train_loader, test_loader = data_manager.get_cnn_train_test_loaders()
+    print(f'Train dataset size: {len(train_loader.dataset)}; Test dataset size: {len(test_loader.dataset)}')
+
+    model.train()
+    print(f'Started learn ConvNN {datetime.datetime.now()}')
+
+    for epoch_number in range(epochs):
+        for index, ([train_x1, train_x2], train_y) in enumerate(train_loader):
+            if torch.cuda.is_available():
+                train_x1, train_x2,  train_y = train_x1.cuda(), train_x2.cuda(), train_y.cuda()
+
+            optimizer.zero_grad()
+
+            train_out = model(train_x1, train_x2)
+            train_loss = criterion(train_out, train_y)
+            _, train_pred = torch.max(train_out.data, 1)
+
+            train_loss.backward()
+            optimizer.step()
+
+            train_accuracy = train_pred.eq(train_y).sum().item() / train_y.size(0)
+
+            if index % 1 == 0:
+                test_loss, test_accuracy = test_net(model, criterion, test_loader)
+                log_statistics(
+                    writer, epoch_number, index, len(train_loader), train_loss.item(),
+                    train_accuracy, test_loss, test_accuracy
+                )
+
+
+def main():
+    marks_csv = 'data/REFERENCE.csv'
+    train_dir = 'data/train'
+    print('Classes balance:', check_classes_balance(marks_csv))
+    # check_gender_age_stats(marks_csv, train_dir)
+    # age_info, data_info = get_mean_deviation(marks_csv, train_dir, intervals=[(1000, 3500)])
+    # print(age_info)
+    # print(data_info)
+
+    data_manager = DataManager(marks_csv, train_dir, batch_size=2048, augment_multiplier=10)
+    # conv_nn = ConvNN()
+    conv_nn = FullyConnectedNN(500)
+    train_net(conv_nn, data_manager)
+
 
 if __name__ == '__main__':
-    filename = dataset_file
-
-    class_column_name = 'class1'
-    excess_column_names = ['class2', 'class3']
-    base_columns_names = ['gender', 'age', class_column_name, *excess_column_names]
-    names_array = [*base_columns_names, *['t{}'.format(i + 1) for i in range(60000)]]
-
-    raw_data = load_and_prepare_data(filename, names_array)
-    current_time = datetime.now().strftime("%d_%m_%Y-%H_%M_%S")
-    models = [
-        {
-            'name': 'Torch neural network',
-            'classifier': TorchNetClassifier(
-                attrs_count=abductions_count * needed_per_abduction + 2, classes_count=9, batch_size=1000
-            ),
-            'writer': SummaryWriter(f'./logs/torch_net_{current_time}'),
-            'batch_size': 1000,
-        },
-        # {
-        #     'name': 'Random forest',
-        #     'classifier': RFClassifier(estimators_number=110, batch_size=1000),
-        #     'writer': SummaryWriter(f'./logs/rf_{current_time}'),
-        #     'batch_size': 1000,
-        # },
-    ]
-
-    for epoch in range(epoch_number):
-        data = make_augmentation(raw_data, multiplier, abductions_count, needed_per_abduction, base_columns_names)
-        data = normalize_and_vectorize(data, class_column_name, excess_column_names)
-        splitted_data = split_data(data, class_column_name, test_set_size, random_state)
-
-        train_x = splitted_data['train_set']['x']
-        train_y = splitted_data['train_set']['y']
-        train_size = splitted_data['train_set']['size']
-
-        test_x = splitted_data['test_set']['x']
-        test_y = splitted_data['test_set']['y']
-
-        print(f'Epoch: {epoch}')
-        for model in models:
-            name = model['name']
-            classifier = model['classifier']
-
-            batches_count = int(np.ceil(train_size / model['batch_size']))
-
-            def lr_logger(x, y): model['writer'].add_scalar('Train/LR', y, x + epoch * batches_count)
-
-            def loss_logger(x, y): model['writer'].add_scalar('Train/Loss', y, x + epoch * batches_count)
-
-            train_error, train_loss = classifier.fit(train_x, train_y, lr_logger, loss_logger)
-            test_error, test_loss = classifier.check(test_x, test_y)
-
-            model['writer'].add_scalar('Train/Error', train_error, epoch)
-            model['writer'].add_scalar('Test/Error', test_error, epoch)
-            model['writer'].add_scalar('Test/Loss', test_loss, epoch)
-
-            print(f'[Name: {name}]; '
-                  f'[Train: error - {train_error}; loss - {train_loss}]; '
-                  f'[Test: error - {test_error}; loss - {test_loss}'
-            )
+    main()
