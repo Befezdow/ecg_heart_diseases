@@ -7,7 +7,7 @@ from transform import CutOff, ToTensor
 
 
 class DataManager:
-    def __init__(self, marks_csv='data/REFERENCE.csv', train_dir='data/train', batch_size=32, sample_width=5000, augment_width=2500, augment_multiplier=5):
+    def __init__(self, marks_csv='data/REFERENCE.csv', train_dir='data/samples', batch_size=32, sample_width=5000, augment_width=2500, augment_multiplier=5):
         self._train_dir = train_dir
         self._marks_csv = marks_csv
         self._batch_size = batch_size
