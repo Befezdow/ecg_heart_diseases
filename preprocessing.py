@@ -94,6 +94,13 @@ def preprocess_data(
                 last_row_id = int(labels_frame.tail(1).to_numpy()[0, 0])
                 current_output_id = last_row_id + 1
                 print(f"PREPROCESS_DATA :: {output_folder} folder detected. Start output id: {current_output_id}")
+
+                answer = ""
+                while answer not in ['y', 'n']:
+                    answer = input('Append new data to exist [Y/N]?').lower()
+                if answer == 'n':
+                    exit(0)
+
             else:  # если существует и некорректна
                 print(f"PREPROCESS_DATA :: {output_folder} folder detected but it has incorrect format. Interrupting ...")
                 exit(1)
@@ -136,7 +143,7 @@ def preprocess_data(
                     # TODO учитывать ситуации, когда размер таймлайна больше чем adjusted_augmentation_size * 3 (макс длина - 72к)
                     samples_to_save.append(row_data[:, 0:adjusted_augmentation_size])  # левая часть таймлайна
                     samples_to_save.append(row_data[:, center_part_offset:center_part_offset+adjusted_augmentation_size])  # центральная часть таймлайна
-                    samples_to_save.append(row_data[:, -adjusted_augmentation_size:-1])  # правая часть таймлайна
+                    samples_to_save.append(row_data[:, -adjusted_augmentation_size:])  # правая часть таймлайна
 
                 for sample in samples_to_save:
                     writer.writerow([current_output_id, row_label] + row_additional_data)
