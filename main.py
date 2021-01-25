@@ -4,6 +4,7 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.optim as optim
 
+from cam import extract_cam
 from data_manager import DataManager
 # from dataset import check_classes_balance, check_gender_age_stats, get_mean_deviation
 from explainable_nn import ExplainableNN
@@ -36,7 +37,7 @@ def train_net(model, data_manager, epochs=20):
                     test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
 
                 test_out = _model(test_x1, test_x2)
-                test_loss = _criterion(test_out, test_y)
+                test_loss = _criterion(test_out, test_y.long())
                 _, test_pred = torch.max(test_out.data, 1)
 
                 test_loss += test_loss.item()
@@ -73,7 +74,7 @@ def train_net(model, data_manager, epochs=20):
             optimizer.zero_grad()
 
             train_out = model(train_x1, train_x2)
-            train_loss = criterion(train_out, train_y)
+            train_loss = criterion(train_out, train_y.long())
             _, train_pred = torch.max(train_out.data, 1)
 
             train_loss.backward()
@@ -109,7 +110,10 @@ def main():
     # network = FullyConnectedNN(500)
     model = ExplainableNN()
 
-    train_net(model, data_manager)
+    # train_net(model, data_manager)
+
+    sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
+    extract_cam(model, 'dropout_9', 'linear', sample)
 
 
 if __name__ == '__main__':

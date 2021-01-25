@@ -18,7 +18,7 @@ class DataManager:
 
         self.cuda_params = {'num_workers': 8, 'pin_memory': True} if torch.cuda.is_available() else {}
 
-    def get_train_loader(self, need_shuffle=True):
+    def get_train_loader(self, need_shuffle=True, custom_batch_size=None):
         dataset = EcgDataset(
             root_dir=self._train_dir,
             labels_file=self._labels_file,
@@ -26,11 +26,12 @@ class DataManager:
             transform=self._cnn_transforms,
         )
 
+        batch_size = self._batch_size if custom_batch_size is None else custom_batch_size
         return torch.utils.data.DataLoader(
-            dataset, batch_size=self._batch_size, shuffle=need_shuffle, **self.cuda_params
+            dataset, batch_size=batch_size, shuffle=need_shuffle, **self.cuda_params
         )
 
-    def get_test_loader(self, need_shuffle=True):
+    def get_test_loader(self, need_shuffle=True, custom_batch_size=None):
         dataset = EcgDataset(
             root_dir=self._test_dir,
             labels_file=self._labels_file,
@@ -38,6 +39,7 @@ class DataManager:
             transform=self._cnn_transforms,
         )
 
+        batch_size = self._batch_size if custom_batch_size is None else custom_batch_size
         return torch.utils.data.DataLoader(
-            dataset, batch_size=self._batch_size, shuffle=need_shuffle, **self.cuda_params
+            dataset, batch_size=batch_size, shuffle=need_shuffle, **self.cuda_params
         )
