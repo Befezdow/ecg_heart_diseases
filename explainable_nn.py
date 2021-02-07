@@ -12,17 +12,16 @@ class ExplainableNN(nn.Module):
 
         self.conv_layers = []
         self.batch_norm_layers = []
+        max_pooling_filter_numbers = {0, 4, 9}
         for i in range(0, self.filters_count):
-            setattr(self, f'conv_{i}', nn.Conv1d(input_size * 2 ** i, input_size * 2 ** (i + 1), kernel_size=2))
+            setattr(self, f'conv_{i}', nn.Conv1d(input_size * 2 ** i, input_size * 2 ** (i + 1), kernel_size=3))
             setattr(self, f'batch_norm_{i}', nn.BatchNorm1d(num_features=input_size * 2 ** (i + 1)))
-            setattr(self, f'max_pooling_{i}', nn.MaxPool1d(kernel_size=2))
+            if i in max_pooling_filter_numbers:
+                setattr(self, f'max_pooling_{i}', nn.MaxPool1d(kernel_size=3))
             setattr(self, f'dropout_{i}', nn.Dropout(0.1))
 
-        self.gap = nn.AvgPool1d(kernel_size=9)
-        # TODO не понятно, какой брать kernel_size у GAP
-        # TODO не совпадает размер данных перед GAP и размер весов FC слоя
-        # self.gap = nn.AdaptiveAvgPool1d(9)
-        self.linear = nn.Linear(442368 + 4, 9)
+        self.gap = nn.AvgPool1d(kernel_size=366)  # в качестве kernel_size берется размерность канала
+        self.linear = nn.Linear(12288, 9)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x1, x2):
@@ -31,12 +30,17 @@ class ExplainableNN(nn.Module):
             conv_data = getattr(self, f'conv_{i}')(conv_data)
             conv_data = getattr(self, f'batch_norm_{i}')(conv_data)
             conv_data = F.relu(conv_data)
-            conv_data = getattr(self, f'max_pooling_{i}')(conv_data)
+
+            max_pooling_layer = getattr(self, f'max_pooling_{i}', None)
+            if max_pooling_layer is not None:
+                conv_data = max_pooling_layer(conv_data)
+
             conv_data = getattr(self, f'dropout_{i}')(conv_data)
 
-        conv_data = self.gap(conv_data)
+        conv_data = self.gap(conv_data)  # сюда приходит [1, 12288, 9980]
         conv_data = conv_data.view(1, -1)
-        data = torch.cat([x1.float(), conv_data], 1)
+        # data = torch.cat([x1.float(), conv_data], 1)
+        data = conv_data
         data = self.linear(data)
         # conv_data = self.sigmoid(conv_data)
         data = F.softmax(data, dim=1)

@@ -69,6 +69,7 @@ def preprocess_data(
     output_labels_file = 'labels.csv'
     train_folder_name = 'data/train'
     test_folder_name = 'data/test'
+    dataset_info_file = 'data/dataset_info.json'
 
     def preprocess_frame(
             frame,
@@ -161,18 +162,31 @@ def preprocess_data(
     print(f'PREPROCESS_DATA :: Dataset information: \n {json.dumps(data_info, indent=2)}')
 
     print(f'PREPROCESS_DATA :: Train dataset preprocessing...')
-    average_timeline_len, min_timeline_len, max_timeline_len = preprocess_frame(
+    train_average_timeline_len, train_min_timeline_len, train_max_timeline_len = preprocess_frame(
         train_frame, input_data_folder, input_data_extension, train_folder_name,
         output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold
     )
-    print(f'PREPROCESS_DATA :: TRAIN - Average len: {average_timeline_len}, Minimal len: {min_timeline_len}, Maximal len: {max_timeline_len}')
+    print(f'PREPROCESS_DATA :: TRAIN - Average len: {train_average_timeline_len}, '
+          f'Minimal len: {train_min_timeline_len}, Maximal len: {train_max_timeline_len}')
 
     print(f'PREPROCESS_DATA :: Test dataset preprocessing...')
-    average_timeline_len, min_timeline_len, max_timeline_len = preprocess_frame(
+    test_average_timeline_len, test_min_timeline_len, test_max_timeline_len = preprocess_frame(
         test_frame, input_data_folder, input_data_extension, test_folder_name,
         output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold
     )
-    print(f'PREPROCESS_DATA :: TEST - Average len: {average_timeline_len}, Minimal len: {min_timeline_len}, Maximal len: {max_timeline_len}')
+    print(f'PREPROCESS_DATA :: TEST - Average len: {test_average_timeline_len}, '
+          f'Minimal len: {test_min_timeline_len}, Maximal len: {test_max_timeline_len}')
+
+    with open(dataset_info_file, 'w') as text_file:
+        data_info['timeline_length'] = {
+            'train_average_timeline_len': train_average_timeline_len,
+            'train_min_timeline_len': train_min_timeline_len,
+            'train_max_timeline_len': train_max_timeline_len,
+            'test_average_timeline_len': test_average_timeline_len,
+            'test_min_timeline_len': test_min_timeline_len,
+            'test_max_timeline_len': test_max_timeline_len,
+        }
+        text_file.write(json.dumps(data_info, indent=2))
 
 
 if __name__ == '__main__':
