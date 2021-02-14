@@ -8,7 +8,7 @@ class ExplainableNN(nn.Module):
         super(ExplainableNN, self).__init__()
 
         input_size = 12
-        self.filters_count = 10
+        self.filters_count = 12
 
         self.conv_layers = []
         self.batch_norm_layers = []
@@ -17,10 +17,10 @@ class ExplainableNN(nn.Module):
             setattr(self, f'conv_{i}', nn.Conv1d(input_size * 2 ** i, input_size * 2 ** (i + 1), kernel_size=3))
             setattr(self, f'batch_norm_{i}', nn.BatchNorm1d(num_features=input_size * 2 ** (i + 1)))
             if i in max_pooling_filter_numbers:
-                setattr(self, f'max_pooling_{i}', nn.MaxPool1d(kernel_size=3))
+                setattr(self, f'max_pooling_{i}', nn.MaxPool1d(kernel_size=3, stride=2))
             setattr(self, f'dropout_{i}', nn.Dropout(0.1))
 
-        self.gap = nn.AvgPool1d(kernel_size=366)  # в качестве kernel_size берется размерность канала
+        self.gap = nn.AvgPool1d(kernel_size=362)  # в качестве kernel_size берется размерность канала
         self.linear = nn.Linear(12288, 9)
         self.sigmoid = nn.Sigmoid()
 

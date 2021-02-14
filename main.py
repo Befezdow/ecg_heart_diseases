@@ -113,7 +113,7 @@ def main():
     # train_net(model, data_manager)
 
     sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
-    extract_cam(model, 'dropout_9', 'linear', sample)
+    extract_cam(model, 'dropout_11', 'linear', sample)
 
 
 if __name__ == '__main__':
