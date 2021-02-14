@@ -1,4 +1,8 @@
 import numpy as np
+from scipy import interpolate
+from matplotlib import pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
 
 
 class SaveFeatures:
@@ -47,4 +51,42 @@ def extract_cam(model, feature_layer_name, fc_layer_name, sample):
 
     return calculate_cam(activated_features.features, weight_softmax, [idx[0].item()])
 
+
+def draw_cam(data_sample, data_cam):
+    sample_timeseries_length = data_sample[1].shape[2]
+
+    x_values = list(range(0, sample_timeseries_length))
+
+    heat_values = []
+    for x_value in x_values:
+        cam_index = int(round(x_value / (sample_timeseries_length - 1) * (data_cam.shape[0] - 1)))
+        heat_values.append(data_cam[cam_index])
+    heat_func = interpolate.interp1d(x_values, heat_values, copy=False)
+    heat_values = heat_func(x_values)
+
+    min_cam_value = data_cam.min()
+    max_cam_value = data_cam.max()
+
+    channels_number = data_sample[1].shape[1]
+    fig, axs = plt.subplots(channels_number)
+    for i in range(0, channels_number):
+        y_values = data_sample[1][0, i].tolist()
+
+        y_min = data_sample[1][0, i].min()
+        y_max = data_sample[1][0, i].max()
+
+        points = np.array([x_values, y_values]).T.reshape(-1, 1, 2)
+        segments = np.concatenate([points[:-1], points[1:]], axis=1)
+
+        norm = plt.Normalize(min_cam_value, max_cam_value)
+        lc = LineCollection(segments, cmap='jet', norm=norm)
+        lc.set_array(heat_values)
+        lc.set_linewidth(2)
+        line = axs[i].add_collection(lc)
+        fig.colorbar(line, ax=axs[i])
+
+        axs[i].set_xlim(0, sample_timeseries_length)
+        axs[i].set_ylim(y_min, y_max)
+
+    plt.show()
 
