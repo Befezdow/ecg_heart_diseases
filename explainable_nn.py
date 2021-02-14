@@ -8,7 +8,7 @@ class ExplainableNN(nn.Module):
         super(ExplainableNN, self).__init__()
 
         input_size = 12
-        self.filters_count = 12
+        self.filters_count = 10
 
         self.conv_layers = []
         self.batch_norm_layers = []
@@ -20,7 +20,7 @@ class ExplainableNN(nn.Module):
                 setattr(self, f'max_pooling_{i}', nn.MaxPool1d(kernel_size=3, stride=2))
             setattr(self, f'dropout_{i}', nn.Dropout(0.1))
 
-        self.gap = nn.AvgPool1d(kernel_size=362)  # в качестве kernel_size берется размерность канала
+        self.gap = nn.AvgPool1d(kernel_size=1241)  # в качестве kernel_size берется размерность канала
         self.linear = nn.Linear(12288, 9)
         self.sigmoid = nn.Sigmoid()
 
@@ -37,7 +37,7 @@ class ExplainableNN(nn.Module):
 
             conv_data = getattr(self, f'dropout_{i}')(conv_data)
 
-        conv_data = self.gap(conv_data)  # сюда приходит [1, 12288, 9980]
+        conv_data = self.gap(conv_data)  # сюда приходит [1, 12288, 1241]
         conv_data = conv_data.view(1, -1)
         # data = torch.cat([x1.float(), conv_data], 1)
         data = conv_data

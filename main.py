@@ -3,6 +3,9 @@ import datetime
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.optim as optim
+from scipy import interpolate
+from matplotlib import pyplot as plt
+from matplotlib import cm
 
 from cam import extract_cam
 from data_manager import DataManager
@@ -113,7 +116,22 @@ def main():
     # train_net(model, data_manager)
 
     sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
-    extract_cam(model, 'dropout_11', 'linear', sample)
+    cam = extract_cam(model, 'dropout_9', 'linear', sample)[0]
+
+    def draw_heat_chart(data_sample, data_cam):
+        sample_timeseries_length = data_sample[1].shape[2]
+
+        x_values = list(range(0, sample_timeseries_length))
+        y_values = data_sample[1][0, 0].tolist()  # TODO for each channel
+        heat_values = []
+        for x_value in x_values:
+            cam_index = int(round(x_value / (sample_timeseries_length - 1) * (data_cam.shape[0] - 1)))
+            heat_values.append(data_cam[cam_index])
+
+        heat_func = interpolate.interp1d(x_values, heat_values, copy=False)
+        plt.scatter(x_values, y_values, c=cm.hot(heat_func(x_values)), edgecolor='none')
+
+    draw_heat_chart(sample, cam)
 
 
 if __name__ == '__main__':

@@ -45,8 +45,6 @@ def extract_cam(model, feature_layer_name, fc_layer_name, sample):
         line = '{:.3f} -> {}'.format(probs[i], idx[i].item())
         print(line)
 
-    cam = calculate_cam(activated_features.features, weight_softmax, [idx[0].item()])
-    print(cam)
-
+    return calculate_cam(activated_features.features, weight_softmax, [idx[0].item()])
 
 
