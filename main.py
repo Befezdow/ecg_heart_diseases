@@ -25,18 +25,26 @@ def log_statistics(writer, epoch_number, index, dataset_size, train_loss, train_
 
 
 def train_net(model, data_manager, epochs=20):
-    def test_net(_model, _criterion, _loader):
+    def test_net(_model, _criterion, _loader, test_batches_number=3):
         _model.eval()
 
         with torch.no_grad():
-            (test_x1, test_x2, test_y) = next(iter(_loader))
-            if torch.cuda.is_available():
-                test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
+            test_loss = 0
+            test_accuracy = 0
+            for i in range(0, test_batches_number):
+                (test_x1, test_x2, test_y) = next(iter(_loader))
+                if torch.cuda.is_available():
+                    test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
 
-            test_out = _model(test_x1, test_x2)
-            test_loss = _criterion(test_out, test_y.long()).item()
-            _, test_pred = torch.max(test_out.data, 1)
-            test_accuracy = test_pred.eq(test_y).sum().item() / test_y.size(0)
+                test_out = _model(test_x1, test_x2)
+                test_loss = _criterion(test_out, test_y.long())
+                _, test_pred = torch.max(test_out.data, 1)
+
+                test_loss += test_loss.item()
+                test_accuracy += test_pred.eq(test_y).sum().item() / test_y.size(0)
+
+            test_loss /= test_batches_number
+            test_accuracy /= test_batches_number
 
         _model.train()
         return test_loss, test_accuracy
@@ -83,6 +91,8 @@ def train_net(model, data_manager, epochs=20):
                     train_accuracy, test_loss, test_accuracy
                 )
 
+        torch.save(model.state_dict(), f'models/{current_iso_date}')
+
 
 def main():
     data_manager = DataManager(
@@ -102,9 +112,6 @@ def main():
 
     train_net(model, data_manager)
 
-    current_time = datetime.datetime.now().isoformat()
-    torch.save(model.state_dict(), f'models/{current_time}')
-
     sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
     cam = extract_cam(model, 'dropout_9', 'linear', sample)[0]
 
@@ -112,4 +119,5 @@ def main():
 
 
 if __name__ == '__main__':
+    print(torch.cuda.is_available())
     main()
