@@ -38,7 +38,7 @@ class ExplainableNN(nn.Module):
             conv_data = getattr(self, f'dropout_{i}')(conv_data)
 
         conv_data = self.gap(conv_data)  # сюда приходит [1, 12288, 1241]
-        conv_data = conv_data.view(1, -1)
+        conv_data = conv_data.view(conv_data.shape[0], -1)
         # data = torch.cat([x1.float(), conv_data], 1)
         data = conv_data
         data = self.linear(data)

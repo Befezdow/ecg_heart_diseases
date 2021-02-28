@@ -29,22 +29,14 @@ def train_net(model, data_manager, epochs=20):
         _model.eval()
 
         with torch.no_grad():
-            test_loss = 0
-            test_accuracy = 0
-            for test_x1, test_x2, test_y in _loader:
-                if torch.cuda.is_available():
-                    test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
+            (test_x1, test_x2, test_y) = next(iter(_loader))
+            if torch.cuda.is_available():
+                test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
 
-                test_out = _model(test_x1, test_x2)
-                test_loss = _criterion(test_out, test_y.long())
-                _, test_pred = torch.max(test_out.data, 1)
-
-                test_loss += test_loss.item()
-                test_accuracy += test_pred.eq(test_y).sum().item() / test_y.size(0)
-
-            test_dataset_size = len(_loader)
-            test_loss /= test_dataset_size
-            test_accuracy /= test_dataset_size
+            test_out = _model(test_x1, test_x2)
+            test_loss = _criterion(test_out, test_y.long()).item()
+            _, test_pred = torch.max(test_out.data, 1)
+            test_accuracy = test_pred.eq(test_y).sum().item() / test_y.size(0)
 
         _model.train()
         return test_loss, test_accuracy
@@ -68,6 +60,7 @@ def train_net(model, data_manager, epochs=20):
     model.train()
     for epoch_number in range(epochs):
         for index, (train_x1, train_x2, train_y) in enumerate(train_loader):
+            print(f'Batch {index}')
             if torch.cuda.is_available():
                 train_x1, train_x2, train_y = train_x1.cuda(), train_x2.cuda(), train_y.cuda()
 
@@ -97,7 +90,7 @@ def main():
         test_dir='data/test',
         labels_file='labels.csv',
         data_folder='samples',
-        batch_size=8
+        batch_size=2
     )
 
     # network = ConvNN()
