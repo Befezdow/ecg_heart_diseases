@@ -14,4 +14,4 @@ class CutOff(object):
 class ToTensor(object):
     def __call__(self, sample):
         (gender, age, height, weight), data, label = sample
-        return torch.tensor([gender, age, height, weight]), torch.from_numpy(data), label
+        return torch.tensor([gender, age, height, weight]), torch.from_numpy(data), label - 1

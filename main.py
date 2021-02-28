@@ -6,7 +6,6 @@ import torch.optim as optim
 
 from cam import extract_cam, draw_cam
 from data_manager import DataManager
-# from dataset import check_classes_balance, check_gender_age_stats, get_mean_deviation
 from explainable_nn import ExplainableNN
 
 
@@ -50,7 +49,8 @@ def train_net(model, data_manager, epochs=20):
         _model.train()
         return test_loss, test_accuracy
 
-    writer = SummaryWriter(f'./logs/ConvNN-{datetime.datetime.now()}')
+    current_iso_date = datetime.datetime.now().isoformat()
+    writer = SummaryWriter(f'./logs/{type(model).__name__}_{current_iso_date}')
 
     if torch.cuda.is_available():
         model.cuda()
@@ -61,7 +61,7 @@ def train_net(model, data_manager, epochs=20):
     train_loader = data_manager.get_train_loader()
     test_loader = data_manager.get_test_loader()
 
-    print(f'Learning started at {datetime.datetime.now()}')
+    print(f'Learning started at {current_iso_date}')
     print(f'Train dataset size: {len(train_loader.dataset)}')
     print(f'Test dataset size: {len(test_loader.dataset)}')
 
@@ -82,35 +82,35 @@ def train_net(model, data_manager, epochs=20):
 
             train_accuracy = train_pred.eq(train_y).sum().item() / train_y.size(0)
 
-            if index % 1 == 0:
+            if index % 5 == 0:
+                print('Calculating test score ...')
                 test_loss, test_accuracy = test_net(model, criterion, test_loader)
                 log_statistics(
                     writer, epoch_number, index, len(train_loader), train_loss.item(),
                     train_accuracy, test_loss, test_accuracy
                 )
 
-def main():
-    marks_csv = 'data/REFERENCE.csv'
-    train_dir = 'data/samples'
-    # print('Classes balance:', check_classes_balance(marks_csv))
-    # check_gender_age_stats(marks_csv, train_dir)
-    # age_info, data_info = get_mean_deviation(marks_csv, train_dir, intervals=[(1000, 3500)])
-    # print(age_info)
-    # print(data_info)
 
+def main():
     data_manager = DataManager(
         train_dir='data/train',
         test_dir='data/test',
         labels_file='labels.csv',
         data_folder='samples',
-        batch_size=1
+        batch_size=8
     )
 
     # network = ConvNN()
     # network = FullyConnectedNN(500)
     model = ExplainableNN()
 
-    # train_net(model, data_manager)
+    # model.load_state_dict(torch.load(f'data/models/2021-02-28T21:10:51.448630'))
+    # model.eval()
+
+    train_net(model, data_manager)
+
+    current_time = datetime.datetime.now().isoformat()
+    torch.save(model.state_dict(), f'models/{current_time}')
 
     sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
     cam = extract_cam(model, 'dropout_9', 'linear', sample)[0]

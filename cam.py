@@ -25,9 +25,6 @@ def calculate_cam(feature_conv, weight_softmax, class_idx):
         cam = weight_softmax[idx].dot(feature_conv.reshape((channels_count, -1)))
         cam = cam - np.min(cam)
         output_cam.append(cam)
-        # cam_img = cam / np.max(cam)
-        # cam_img = np.uint8(255 * cam_img)
-        # output_cam.append(cv2.resize(cam_img, size_upsample))
     return output_cam
 
 
