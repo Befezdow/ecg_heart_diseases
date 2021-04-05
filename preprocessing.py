@@ -2,6 +2,7 @@ import json
 import math
 import os
 import csv
+import random
 
 import numpy as np
 import scipy.io as sio
@@ -63,6 +64,7 @@ def preprocess_data(
         split_test_part=0.2,  # процент данных в тестовом датасете
         adjusted_augmentation_size=10000,  # итоговая длина таймлайнов элементов данных
         augmentation_overlong_threshold=1000,  # порог, при привышении которого относительно adjusted_augmentation_size срабатывает аугментация
+        augmentation_multiplier=5,  # множитель аугментации (во сколько записей превращается одна)
         input_data_folder='data/samples',  # имя папки, содержащей файлы с данными
         input_data_extension='mat',  # расширение файлов с данными
 ):
@@ -79,6 +81,7 @@ def preprocess_data(
             output_labels_file,
             adjusted_augmentation_size,
             augmentation_overlong_threshold,
+            augmentation_multiplier,
     ):
         current_output_id = 0
         full_output_labels_file = os.path.join(output_folder, output_labels_file)
@@ -86,7 +89,7 @@ def preprocess_data(
 
         # проверяем существование папки с выходным датасетом
         if not os.path.exists(output_folder):  # если не существует, то создаем
-            print(f"PREPROCESS_DATA :: Train folder doesn't exist. Creating folder {output_folder} ...")
+            print(f"PREPROCESS_DATA :: {output_folder} folder doesn't exist. Creating folder {output_folder} ...")
             os.makedirs(output_folder)
             os.makedirs(samples_folder)
         else:
@@ -137,14 +140,23 @@ def preprocess_data(
                 # если длина таймлайна больше нужного, но недостаточна для аугментации то обрезаем его
                 elif row_data_length - adjusted_augmentation_size < augmentation_overlong_threshold:
                     samples_to_save.append(np.delete(row_data, np.s_[adjusted_augmentation_size:], 1))
-                # если длина таймлайна больше нужного, и достаточна для аугментации то аугментируем одну запись в три
+                # если длина таймлайна больше нужного, и достаточна для аугментации то аугментируем одну запись в несколько
                 else:
-                    center_part_offset = math.floor((row_data_length - adjusted_augmentation_size) / 2)
+                    # multiplier = math.ceil((row_data_length - adjusted_augmentation_size) / augmentation_overlong_threshold) + 1
+                    # multiplier = math.ceil(row_data_length / adjusted_augmentation_size) * augmentation_multiplier
 
-                    # TODO учитывать ситуации, когда размер таймлайна больше чем adjusted_augmentation_size * 3 (макс длина - 72к)
-                    samples_to_save.append(row_data[:, 0:adjusted_augmentation_size])  # левая часть таймлайна
-                    samples_to_save.append(row_data[:, center_part_offset:center_part_offset+adjusted_augmentation_size])  # центральная часть таймлайна
-                    samples_to_save.append(row_data[:, -adjusted_augmentation_size:])  # правая часть таймлайна
+                    # TODO аугментировать с учетом баланса классов
+                    multiplier = augmentation_multiplier
+                    for i in range(0, multiplier):
+                        interval_start = random.randint(0, row_data_length - adjusted_augmentation_size)
+                        interval_end = interval_start+adjusted_augmentation_size
+                        samples_to_save.append(row_data[:, interval_start:interval_end])
+
+                    # простая аугментация на 1 в 3
+                    # center_part_offset = math.floor((row_data_length - adjusted_augmentation_size) / 2)
+                    # samples_to_save.append(row_data[:, 0:adjusted_augmentation_size])  # левая часть таймлайна
+                    # samples_to_save.append(row_data[:, center_part_offset:center_part_offset+adjusted_augmentation_size])  # центральная часть таймлайна
+                    # samples_to_save.append(row_data[:, -adjusted_augmentation_size:])  # правая часть таймлайна
 
                 for sample in samples_to_save:
                     writer.writerow([current_output_id, row_label] + row_additional_data)
@@ -164,7 +176,7 @@ def preprocess_data(
     print(f'PREPROCESS_DATA :: Train dataset preprocessing...')
     train_average_timeline_len, train_min_timeline_len, train_max_timeline_len = preprocess_frame(
         train_frame, input_data_folder, input_data_extension, train_folder_name,
-        output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold
+        output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold, augmentation_multiplier
     )
     print(f'PREPROCESS_DATA :: TRAIN - Average len: {train_average_timeline_len}, '
           f'Minimal len: {train_min_timeline_len}, Maximal len: {train_max_timeline_len}')
@@ -172,7 +184,7 @@ def preprocess_data(
     print(f'PREPROCESS_DATA :: Test dataset preprocessing...')
     test_average_timeline_len, test_min_timeline_len, test_max_timeline_len = preprocess_frame(
         test_frame, input_data_folder, input_data_extension, test_folder_name,
-        output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold
+        output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold, augmentation_multiplier
     )
     print(f'PREPROCESS_DATA :: TEST - Average len: {test_average_timeline_len}, '
           f'Minimal len: {test_min_timeline_len}, Maximal len: {test_max_timeline_len}')
@@ -190,4 +202,4 @@ def preprocess_data(
 
 
 if __name__ == '__main__':
-    preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 0.2, 10000, 1000, 'data/samples', 'mat')
+    preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 0.2, 5000, 1000, 5, 'data/samples', 'mat')
