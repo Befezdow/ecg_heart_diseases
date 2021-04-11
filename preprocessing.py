@@ -30,7 +30,7 @@ def load_data_file(folder_path, file_name, extension):
     return data, additional_data
 
 
-def split_data(labels_file, id_column, label_column, test_part=0.2):
+def split_data(labels_file, id_column, label_column, test_size=50):
     labels_frame = pd.read_csv(labels_file)
     labels_frame = labels_frame[[id_column, label_column]]  # дропаем лишние колонки
 
@@ -41,7 +41,9 @@ def split_data(labels_file, id_column, label_column, test_part=0.2):
     test_frame = pd.DataFrame()
     for label in unique_labels:  # делаем разбиение на samples и test для каждого класса отдельно
         labelled_rows = labels_frame[labels_frame[label_column] == label]
-        labelled_train, labelled_test = train_test_split(labelled_rows, test_size=test_part)
+        labelled_test = labelled_rows.sample(n=test_size)
+        labelled_train = pd.concat([labelled_rows, labelled_test]).drop_duplicates(keep=False)
+
         train_frame = pd.concat([train_frame, labelled_train], axis=0, sort=False, ignore_index=True)
         test_frame = pd.concat([test_frame, labelled_test], axis=0, sort=False, ignore_index=True)
 
@@ -57,14 +59,22 @@ def split_data(labels_file, id_column, label_column, test_part=0.2):
     return (train_frame, test_frame), data_info
 
 
+def calculate_class_balance(data_info):
+    summary_count = sum(map(lambda elem: elem['total_size'], data_info['by_labels'].values()))
+    result = {}
+    for key, value in data_info['by_labels'].items():
+        result[key] = value['total_size'] / summary_count
+    return result
+
+
 def preprocess_data(
         input_labels_file,  # название файла, содержащего метки классов
         id_column_name,  # название колонки, содержащей id записи (название файла)
         label_column_name,  # название колонки, содержащей метки классов
-        split_test_part=0.2,  # процент данных в тестовом датасете
+        split_test_size=50,  # процент данных в тестовом датасете
         adjusted_augmentation_size=10000,  # итоговая длина таймлайнов элементов данных
         augmentation_overlong_threshold=1000,  # порог, при привышении которого относительно adjusted_augmentation_size срабатывает аугментация
-        augmentation_multiplier=5,  # множитель аугментации (во сколько записей превращается одна)
+        max_augmentation_multiplier=5,  # множитель аугментации (во сколько записей превращается одна)
         input_data_folder='data/samples',  # имя папки, содержащей файлы с данными
         input_data_extension='mat',  # расширение файлов с данными
 ):
@@ -79,9 +89,11 @@ def preprocess_data(
             input_extension,
             output_folder,
             output_labels_file,
+            need_augmentation,
             adjusted_augmentation_size,
             augmentation_overlong_threshold,
-            augmentation_multiplier,
+            max_augmentation_multiplier,
+            class_balance
     ):
         current_output_id = 0
         full_output_labels_file = os.path.join(output_folder, output_labels_file)
@@ -114,6 +126,12 @@ def preprocess_data(
         min_row_data_length = math.inf
         with open(full_output_labels_file, 'a') as labels_file:
             writer = csv.writer(labels_file)
+
+            augmentation_multipliers = {}
+            max_part = max(class_balance.values())
+            for key, value in class_balance.items():
+                augmentation_multipliers[key] = 1 / (value / max_part)
+
             for index, row in frame.iterrows():
                 row_id = row[id_column_name]
                 row_label = row[label_column_name]
@@ -138,15 +156,14 @@ def preprocess_data(
                     right_padding = np.zeros((12, right_padding_size), dtype=np.float64)
                     samples_to_save.append(np.hstack((left_padding, row_data, right_padding)))
                 # если длина таймлайна больше нужного, но недостаточна для аугментации то обрезаем его
-                elif row_data_length - adjusted_augmentation_size < augmentation_overlong_threshold:
+                elif not need_augmentation or row_data_length - adjusted_augmentation_size < augmentation_overlong_threshold:
                     samples_to_save.append(np.delete(row_data, np.s_[adjusted_augmentation_size:], 1))
                 # если длина таймлайна больше нужного, и достаточна для аугментации то аугментируем одну запись в несколько
                 else:
                     # multiplier = math.ceil((row_data_length - adjusted_augmentation_size) / augmentation_overlong_threshold) + 1
                     # multiplier = math.ceil(row_data_length / adjusted_augmentation_size) * augmentation_multiplier
 
-                    # TODO аугментировать с учетом баланса классов
-                    multiplier = augmentation_multiplier
+                    multiplier = round(augmentation_multipliers[row_label] * max_augmentation_multiplier)
                     for i in range(0, multiplier):
                         interval_start = random.randint(0, row_data_length - adjusted_augmentation_size)
                         interval_end = interval_start+adjusted_augmentation_size
@@ -169,22 +186,42 @@ def preprocess_data(
 
         return total_row_data_length / (index + 1), min_row_data_length, max_row_data_length
 
-    (train_frame, test_frame), data_info = split_data(input_labels_file, id_column_name, label_column_name, split_test_part)
+    (train_frame, test_frame), data_info = split_data(
+        input_labels_file, id_column_name, label_column_name, split_test_size
+    )
+    class_balance = calculate_class_balance(data_info)
+    data_info['class_balance'] = class_balance
 
     print(f'PREPROCESS_DATA :: Dataset information: \n {json.dumps(data_info, indent=2)}')
 
     print(f'PREPROCESS_DATA :: Train dataset preprocessing...')
     train_average_timeline_len, train_min_timeline_len, train_max_timeline_len = preprocess_frame(
-        train_frame, input_data_folder, input_data_extension, train_folder_name,
-        output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold, augmentation_multiplier
+        frame=train_frame,
+        input_folder=input_data_folder,
+        input_extension=input_data_extension,
+        output_folder=train_folder_name,
+        output_labels_file=output_labels_file,
+        need_augmentation=True,
+        adjusted_augmentation_size=adjusted_augmentation_size,
+        augmentation_overlong_threshold=augmentation_overlong_threshold,
+        max_augmentation_multiplier=max_augmentation_multiplier,
+        class_balance=class_balance
     )
     print(f'PREPROCESS_DATA :: TRAIN - Average len: {train_average_timeline_len}, '
           f'Minimal len: {train_min_timeline_len}, Maximal len: {train_max_timeline_len}')
 
     print(f'PREPROCESS_DATA :: Test dataset preprocessing...')
     test_average_timeline_len, test_min_timeline_len, test_max_timeline_len = preprocess_frame(
-        test_frame, input_data_folder, input_data_extension, test_folder_name,
-        output_labels_file, adjusted_augmentation_size, augmentation_overlong_threshold, augmentation_multiplier
+        frame=test_frame,
+        input_folder=input_data_folder,
+        input_extension=input_data_extension,
+        output_folder=test_folder_name,
+        output_labels_file=output_labels_file,
+        need_augmentation=False,
+        adjusted_augmentation_size=adjusted_augmentation_size,
+        augmentation_overlong_threshold=augmentation_overlong_threshold,
+        max_augmentation_multiplier=max_augmentation_multiplier,
+        class_balance=class_balance
     )
     print(f'PREPROCESS_DATA :: TEST - Average len: {test_average_timeline_len}, '
           f'Minimal len: {test_min_timeline_len}, Maximal len: {test_max_timeline_len}')
@@ -201,5 +238,36 @@ def preprocess_data(
         text_file.write(json.dumps(data_info, indent=2))
 
 
+def check_dataset(labels_file):
+    labels_frame = pd.read_csv(labels_file)
+
+    labels_column = labels_frame.iloc[:, 1].astype(str)
+
+    unique_labels = labels_column.unique()  # получаем уникальные лэйблы
+    label_counts = labels_column.value_counts()
+
+    result = {
+        'count': {},
+        'percentage': {}
+    }
+    total_count = 0
+    for label in unique_labels:
+        result['count'][label] = int(label_counts[label])
+        total_count += int(label_counts[label])
+
+    for key, value in result['count'].items():
+        result['percentage'][key] = value / total_count
+
+    return result
+
+
 if __name__ == '__main__':
-    preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 0.2, 5000, 1000, 5, 'data/samples', 'mat')
+    preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 50, 5000, 1000, 3, 'data/samples', 'mat')
+
+    train_dataset_data = check_dataset('data/train/labels.csv')
+    print('Train result:')
+    print(json.dumps(train_dataset_data, indent=2))
+
+    test_dataset_data = check_dataset('data/test/labels.csv')
+    print('Test result:')
+    print(json.dumps(test_dataset_data, indent=2))
