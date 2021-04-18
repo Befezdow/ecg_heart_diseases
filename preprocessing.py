@@ -263,7 +263,6 @@ def check_dataset(labels_file):
 
 def slice_dataset(dataset_folder, parts_count=2):
     labels_file_path = os.path.join(dataset_folder, 'labels.csv')
-    records_folder_path = os.path.join(dataset_folder, 'samples')
 
     labels_frame = pd.read_csv(labels_file_path, header=None)
 
@@ -299,8 +298,24 @@ def slice_dataset(dataset_folder, parts_count=2):
         value.to_csv(new_labels_path, header=False, index=False)
 
 
+def check_records_length(dataset_folder, expected_length):
+    records_path = os.path.join(dataset_folder, 'samples')
+    records = os.listdir(records_path)
+
+    errors = {}
+    for record in records:
+        record_path = os.path.join(records_path, record)
+        frame = pd.read_csv(record_path, header=None)
+        frame_size = frame.shape[0]
+        if frame_size != expected_length:
+            errors[record] = frame_size
+            print(f'Length error: {record} - {frame_size}')
+
+    return errors
+
+
 if __name__ == '__main__':
-    preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 50, 5000, 1000, 3, 'data/samples', 'mat')
+    # preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 50, 5000, 1000, 3, 'data/samples', 'mat')
 
     train_dataset_data = check_dataset('data/train/labels.csv')
     print('Train result:')
@@ -310,8 +325,8 @@ if __name__ == '__main__':
     print('Test result:')
     print(json.dumps(test_dataset_data, indent=2))
 
-    print('Splitting train dataset...')
-    slice_dataset('data/train', 2)
+    # print('Splitting train dataset...')
+    # slice_dataset('data/train', 2)
 
     train0_dataset_data = check_dataset('data/train/splitted/train0/labels.csv')
     print('Train0 result:')
@@ -320,5 +335,20 @@ if __name__ == '__main__':
     train1_dataset_data = check_dataset('data/train/splitted/train1/labels.csv')
     print('Train1 result:')
     print(json.dumps(train1_dataset_data, indent=2))
+
+    print('Checking train0 records length...')
+    train0_errors = check_records_length('data/train/splitted/train0', 5000)
+    print('Train0 errors:')
+    print(json.dumps(train0_errors, indent=2))
+
+    print('Checking train1 records length...')
+    train1_errors = check_records_length('data/train/splitted/train1', 5000)
+    print('Train1 errors:')
+    print(json.dumps(train1_errors, indent=2))
+
+    print('Checking test records length...')
+    test_errors = check_records_length('data/test', 5000)
+    print('Test errors:')
+    print(json.dumps(test_errors, indent=2))
 
     print('Done')

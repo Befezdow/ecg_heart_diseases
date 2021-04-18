@@ -6,7 +6,7 @@ import torch.optim as optim
 
 from cam import extract_cam, draw_cam
 from data_manager import DataManager
-from explainable_nn import ExplainableNN
+from explainable_nn import ExplainableNN, SimpleExplainableNN
 
 
 def log_statistics(writer, epoch_number, index, dataset_size, train_loss, train_accuracy, test_loss, test_accuracy):
@@ -105,7 +105,7 @@ def main():
 
     # network = ConvNN()
     # network = FullyConnectedNN(500)
-    model = ExplainableNN()
+    model = SimpleExplainableNN()
 
     # model.load_state_dict(torch.load(f'data/models/2021-02-28T21:10:51.448630'))
     # model.eval()
@@ -113,7 +113,7 @@ def main():
     train_net(model, data_manager)
 
     sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
-    cam = extract_cam(model, 'dropout_9', 'linear', sample)[0]
+    cam = extract_cam(model, 'dropout25', 'linear', sample)[0]
 
     draw_cam(sample, cam)
 

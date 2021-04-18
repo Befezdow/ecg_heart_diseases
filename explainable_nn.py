@@ -46,3 +46,51 @@ class ExplainableNN(nn.Module):
         data = F.softmax(data, dim=1)
 
         return data
+
+
+class SimpleExplainableNN(nn.Module):
+    def __init__(self):
+        super(SimpleExplainableNN, self).__init__()
+
+        # convolutional layers
+        self.conv1 = nn.Conv1d(12, 24, kernel_size=3)
+        self.conv2 = nn.Conv1d(24, 48, kernel_size=3)
+        self.conv3 = nn.Conv1d(48, 96, kernel_size=3)
+
+        # max pooling
+        self.maxPooling = nn.MaxPool1d(kernel_size=3, stride=1)
+
+        self.batchNorm = nn.BatchNorm1d(num_features=12)
+
+        self.flat_size = 96 * 91
+        self.feed_forward_input_size = 96 * 91 + 2
+
+        # dropouts
+        self.dropout25 = nn.Dropout(0.25)
+
+        self.gap = nn.AvgPool1d(kernel_size=4988)  # в качестве kernel_size берется размерность канала
+        self.linear = nn.Linear(96, 9)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x1, x2):
+        print(x2.shape)
+        x2 = self.batchNorm(x2)
+        print(x2.shape)
+        x2 = self.maxPooling(F.relu(self.conv1(x2)))
+        print(x2.shape)
+        x2 = self.maxPooling(F.relu(self.conv2(x2)))
+        print(x2.shape)
+        x2 = self.maxPooling(F.relu(self.conv3(x2)))
+        print(x2.shape)
+        x2 = self.dropout25(x2)
+        print(x2.shape)
+
+        x2 = self.gap(x2)
+        x2 = x2.view(x2.shape[0], -1)
+        # data = torch.cat([x1.float(), x2], 1)
+        data = x2
+        data = self.linear(data)
+        # conv_data = self.sigmoid(conv_data)
+        data = F.softmax(data, dim=1)
+
+        return data
