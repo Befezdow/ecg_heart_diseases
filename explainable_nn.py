@@ -58,7 +58,7 @@ class SimpleExplainableNN(nn.Module):
         self.conv3 = nn.Conv1d(48, 96, kernel_size=3)
 
         # max pooling
-        self.maxPooling = nn.MaxPool1d(kernel_size=3, stride=1)
+        self.maxPooling = nn.MaxPool1d(kernel_size=3)
 
         self.batchNorm = nn.BatchNorm1d(num_features=12)
 
@@ -68,7 +68,7 @@ class SimpleExplainableNN(nn.Module):
         # dropouts
         self.dropout25 = nn.Dropout(0.25)
 
-        self.gap = nn.AvgPool1d(kernel_size=4988)  # в качестве kernel_size берется размерность канала
+        self.gap = nn.AvgPool1d(kernel_size=184)  # в качестве kernel_size берется размерность канала
         self.linear = nn.Linear(96, 9)
         self.sigmoid = nn.Sigmoid()
 
