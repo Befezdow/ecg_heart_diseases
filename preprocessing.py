@@ -3,11 +3,11 @@ import math
 import os
 import csv
 import random
+import shutil
 
 import numpy as np
 import scipy.io as sio
 import pandas as pd
-from sklearn.model_selection import train_test_split
 
 
 def load_data_file(folder_path, file_name, extension):
@@ -239,7 +239,7 @@ def preprocess_data(
 
 
 def check_dataset(labels_file):
-    labels_frame = pd.read_csv(labels_file)
+    labels_frame = pd.read_csv(labels_file, header=None)
 
     labels_column = labels_frame.iloc[:, 1].astype(str)
 
@@ -261,6 +261,44 @@ def check_dataset(labels_file):
     return result
 
 
+def slice_dataset(dataset_folder, parts_count=2):
+    labels_file_path = os.path.join(dataset_folder, 'labels.csv')
+    records_folder_path = os.path.join(dataset_folder, 'samples')
+
+    labels_frame = pd.read_csv(labels_file_path, header=None)
+
+    unique_labels = labels_frame.iloc[:, 1].unique()  # получаем уникальные лэйблы
+
+    dataframes = {}
+    for i in range(0, parts_count):
+        dataframes[i] = pd.DataFrame()
+
+    for label in unique_labels:
+        label_rows = labels_frame.loc[labels_frame.iloc[:, 1] == label]
+        rows_count = label_rows.shape[0]
+        part_size = math.ceil(rows_count / parts_count)
+
+        for i in range(0, parts_count):
+            part = label_rows.iloc[i * part_size : (i + 1) * part_size, :]
+            dataframes[i] = pd.concat([dataframes.get(i), part], axis=0, sort=False, ignore_index=True)
+
+    splitted_folder_path = os.path.join(dataset_folder, 'splitted')
+    for key, value in dataframes.items():
+        splitted_dataset_folder = os.path.join(splitted_folder_path, f"{dataset_folder.rsplit('/', 1)[-1]}{key}")
+        records_folder = os.path.join(splitted_dataset_folder, 'samples')
+        os.makedirs(records_folder)
+
+        old_records_folder = os.path.join(dataset_folder, 'samples')
+        for index, row in value.iterrows():
+            record_index = row[0].astype(int)
+            old_path = os.path.join(old_records_folder, f'{record_index}.csv')
+            new_path = os.path.join(records_folder, f'{record_index}.csv')
+            shutil.copyfile(old_path, new_path)
+
+        new_labels_path = os.path.join(splitted_dataset_folder, 'labels.csv')
+        value.to_csv(new_labels_path, header=False, index=False)
+
+
 if __name__ == '__main__':
     preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 50, 5000, 1000, 3, 'data/samples', 'mat')
 
@@ -271,3 +309,16 @@ if __name__ == '__main__':
     test_dataset_data = check_dataset('data/test/labels.csv')
     print('Test result:')
     print(json.dumps(test_dataset_data, indent=2))
+
+    print('Splitting train dataset...')
+    slice_dataset('data/train', 2)
+
+    train0_dataset_data = check_dataset('data/train/splitted/train0/labels.csv')
+    print('Train0 result:')
+    print(json.dumps(train0_dataset_data, indent=2))
+
+    train1_dataset_data = check_dataset('data/train/splitted/train1/labels.csv')
+    print('Train1 result:')
+    print(json.dumps(train1_dataset_data, indent=2))
+
+    print('Done')
