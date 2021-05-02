@@ -4,9 +4,9 @@ from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.optim as optim
 
-from cam import extract_cam, draw_cam
+from cam import extract_cam, draw_cam, extract_grad_cam
 from data_manager import DataManager
-from explainable_nn import ExplainableNN, SimpleExplainableNN
+from explainable_nn import ExplainableNN, SimpleExplainableNN, GradSimpleExplainableNN
 
 
 def log_statistics(writer, epoch_number, index, dataset_size, train_loss, train_accuracy, test_loss, test_accuracy):
@@ -68,7 +68,6 @@ def train_net(model, data_manager, epochs=20):
     model.train()
     for epoch_number in range(epochs):
         for index, (train_x1, train_x2, train_y) in enumerate(train_loader):
-            print(f'Batch {index}')
             if torch.cuda.is_available():
                 train_x1, train_x2, train_y = train_x1.cuda(), train_x2.cuda(), train_y.cuda()
 
@@ -100,20 +99,22 @@ def main():
         test_dir='data/test',
         labels_file='labels.csv',
         data_folder='samples',
-        batch_size=2
+        batch_size=128
     )
 
     # network = ConvNN()
     # network = FullyConnectedNN(500)
-    model = SimpleExplainableNN()
+    # model = SimpleExplainableNN()
+    model = GradSimpleExplainableNN()
 
     # model.load_state_dict(torch.load(f'data/models/2021-02-28T21:10:51.448630'))
     # model.eval()
 
-    train_net(model, data_manager)
+    train_net(model, data_manager, epochs=1)
 
     sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
-    cam = extract_cam(model, 'dropout25', 'linear', sample)[0]
+    # cam = extract_cam(model, 'dropout25', 'linear', sample)[0]
+    cam = extract_grad_cam(model, sample)
 
     draw_cam(sample, cam)
 

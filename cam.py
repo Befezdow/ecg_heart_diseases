@@ -116,5 +116,9 @@ def extract_grad_cam(model, sample):
 
     # TODO check formula
     # weight the channels by corresponding gradients
-    # for i in range(512):
-    #     activations[:, i, :, :] *= pooled_gradients[i]
+    for i in range(96):
+        activations[:, i, :] *= pooled_gradients[:, i, :]
+
+    # average the channels of the activations
+    heatmap = torch.mean(activations, dim=1).squeeze()
+    return heatmap

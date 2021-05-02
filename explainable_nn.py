@@ -94,7 +94,7 @@ class GradSimpleExplainableNN(nn.Module):
         self.conv2 = nn.Conv1d(24, 48, kernel_size=3)
         self.conv3 = nn.Conv1d(48, 96, kernel_size=3)
 
-        self.fc1 = nn.Linear(self.feed_forward_input_size, 1024)
+        self.fc1 = nn.Linear(17668, 1024)
         self.fc2 = nn.Linear(1024, 512)
         self.fc3 = nn.Linear(512, 9)
 
@@ -122,7 +122,8 @@ class GradSimpleExplainableNN(nn.Module):
         x2 = self._apply_conv(x2)
 
         # register the hook
-        h = x2.register_hook(self.activations_hook)
+        if not self.train and x2.requires_grad:
+            h = x2.register_hook(self.activations_hook)
 
         x2 = x2.view(x2.shape[0], -1)
         x = torch.cat([x1.float(), x2], 1)
