@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from scipy import interpolate
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
@@ -32,8 +33,11 @@ def extract_cam(model, feature_layer_name, fc_layer_name, sample):
     feature_layer = model._modules.get(feature_layer_name)
     activated_features = SaveFeatures(feature_layer)
 
-    model.eval()
     (x1, x2, y) = sample
+    if torch.cuda.is_available():
+        x1, x2, y = x1.cuda(), x2.cuda(), y.cuda()
+
+    model.eval()
     out = model(x1, x2)
     pred_probabilities = out.data.squeeze()
     probs, idx = pred_probabilities.sort(0, True)
@@ -87,3 +91,30 @@ def draw_cam(data_sample, data_cam):
 
     plt.show()
 
+
+def extract_grad_cam(model, sample):
+    (x1, x2, y) = sample
+    if torch.cuda.is_available():
+        x1, x2, y = x1.cuda(), x2.cuda(), y.cuda()
+
+    model.eval()
+    out = model(x1, x2)
+
+    # Now, we are going to do the back-propagation with the logit of
+    # the 386th class which represents the ‘African_elephant’ in the ImageNet dataset.
+    out[:, y.item()].backward()
+
+    # pull the gradients out of the model
+    gradients = model.get_activations_gradient()
+
+    # pool the gradients across the channels
+    gap = torch.nn.AvgPool1d(kernel_size=184)  # в качестве kernel_size берется размерность канала
+    pooled_gradients = gap(gradients)
+
+    # get the activations of the last convolutional layer
+    activations = model.get_activations(x1, x2).detach()
+
+    # TODO check formula
+    # weight the channels by corresponding gradients
+    # for i in range(512):
+    #     activations[:, i, :, :] *= pooled_gradients[i]
