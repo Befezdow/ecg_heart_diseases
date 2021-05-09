@@ -3,7 +3,6 @@ import torch
 from scipy import interpolate
 from matplotlib import pyplot as plt
 from matplotlib.collections import LineCollection
-from matplotlib.colors import ListedColormap, BoundaryNorm
 
 
 class SaveFeatures:
@@ -17,16 +16,6 @@ class SaveFeatures:
 
     def remove(self):
         self.hook.remove()
-
-
-def calculate_cam(feature_conv, weight_softmax, class_idx):
-    batch_size, channels_count, channel_size = feature_conv.shape
-    output_cam = []
-    for idx in class_idx:
-        cam = weight_softmax[idx].dot(feature_conv.reshape((channels_count, -1)))
-        cam = cam - np.min(cam)
-        output_cam.append(cam)
-    return output_cam
 
 
 def extract_cam(model, feature_layer_name, fc_layer_name, sample):
@@ -50,7 +39,42 @@ def extract_cam(model, feature_layer_name, fc_layer_name, sample):
         line = '{:.3f} -> {}'.format(probs[i], idx[i].item())
         print(line)
 
-    return calculate_cam(activated_features.features, weight_softmax, [idx[0].item()])
+    class_id = idx[0].item()
+    feature_conv = activated_features.features
+    batch_size, channels_count, channel_size = feature_conv.shape
+    cam = weight_softmax[class_id].dot(feature_conv.reshape((channels_count, -1)))
+    cam = cam - np.min(cam)
+    return cam
+
+
+def extract_grad_cam(model, sample):
+    (x1, x2, y) = sample
+    if torch.cuda.is_available():
+        x1, x2, y = x1.cuda(), x2.cuda(), y.cuda()
+
+    model.eval()
+    out = model(x1, x2)
+
+    # we are going to do the back-propagation with the logit of specific class
+    out[:, y.item()].backward()
+
+    # pull the gradients out of the model
+    gradients = model.get_activations_gradient()
+
+    # pool the gradients across the channels
+    pooled_gradients = torch.mean(gradients, dim=[0, 2])
+
+    # get the activations of the last convolutional layer
+    activations = model.get_activations(x1, x2).detach()
+
+    # weight the channels by corresponding gradients
+    for i in range(96):
+        activations[:, i, :] *= pooled_gradients[i]
+
+    # average the channels of the activations
+    grad_cam = torch.mean(activations, dim=1).squeeze().numpy()
+    grad_cam = grad_cam - np.min(grad_cam)
+    return grad_cam
 
 
 def draw_cam(data_sample, data_cam):
@@ -69,7 +93,7 @@ def draw_cam(data_sample, data_cam):
     max_cam_value = data_cam.max()
 
     channels_number = data_sample[1].shape[1]
-    fig, axs = plt.subplots(channels_number)
+    fig, axs = plt.subplots(channels_number, figsize=(120, 80), dpi=50)
     for i in range(0, channels_number):
         y_values = data_sample[1][0, i].tolist()
 
@@ -90,35 +114,3 @@ def draw_cam(data_sample, data_cam):
         axs[i].set_ylim(y_min, y_max)
 
     plt.show()
-
-
-def extract_grad_cam(model, sample):
-    (x1, x2, y) = sample
-    if torch.cuda.is_available():
-        x1, x2, y = x1.cuda(), x2.cuda(), y.cuda()
-
-    model.eval()
-    out = model(x1, x2)
-
-    # Now, we are going to do the back-propagation with the logit of
-    # the 386th class which represents the ‘African_elephant’ in the ImageNet dataset.
-    out[:, y.item()].backward()
-
-    # pull the gradients out of the model
-    gradients = model.get_activations_gradient()
-
-    # pool the gradients across the channels
-    gap = torch.nn.AvgPool1d(kernel_size=184)  # в качестве kernel_size берется размерность канала
-    pooled_gradients = gap(gradients)
-
-    # get the activations of the last convolutional layer
-    activations = model.get_activations(x1, x2).detach()
-
-    # TODO check formula
-    # weight the channels by corresponding gradients
-    for i in range(96):
-        activations[:, i, :] *= pooled_gradients[:, i, :]
-
-    # average the channels of the activations
-    heatmap = torch.mean(activations, dim=1).squeeze()
-    return heatmap

@@ -122,8 +122,8 @@ class GradSimpleExplainableNN(nn.Module):
         x2 = self._apply_conv(x2)
 
         # register the hook
-        if not self.train and x2.requires_grad: # TODO dont sure about self.train
-            h = x2.register_hook(self.activations_hook)
+        if not self.training and x2.requires_grad:
+            x2.register_hook(self.activations_hook)
 
         x2 = x2.view(x2.shape[0], -1)
         x = torch.cat([x1.float(), x2], 1)

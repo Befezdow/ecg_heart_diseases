@@ -113,7 +113,7 @@ def main():
     train_net(model, data_manager, epochs=1)
 
     sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
-    # cam = extract_cam(model, 'dropout25', 'linear', sample)[0]
+    # cam = extract_cam(model, 'dropout25', 'linear', sample)
     cam = extract_grad_cam(model, sample)
 
     draw_cam(sample, cam)
