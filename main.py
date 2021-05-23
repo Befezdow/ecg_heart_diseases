@@ -6,7 +6,7 @@ import torch.optim as optim
 
 from cam import extract_cam, draw_cam, extract_grad_cam
 from data_manager import DataManager
-from explainable_nn import ExplainableNN, SimpleExplainableNN, GradSimpleExplainableNN
+from explainable_nn import ExplainableNN, SimpleExplainableNN, GradSimpleExplainableNN, RegularizedGradSimpleExplainableNN
 
 
 def log_statistics(writer, epoch_number, index, dataset_size, train_loss, train_accuracy, test_loss, test_accuracy):
@@ -65,6 +65,9 @@ def train_net(model, data_manager, epochs=20):
     print(f'Train dataset size: {len(train_loader.dataset)}')
     print(f'Test dataset size: {len(test_loader.dataset)}')
 
+    # for detecting errors
+    # torch.autograd.set_detect_anomaly(True)
+
     model.train()
     for epoch_number in range(epochs):
         for index, (train_x1, train_x2, train_y) in enumerate(train_loader):
@@ -99,26 +102,32 @@ def main():
         test_dir='data/test',
         labels_file='labels.csv',
         data_folder='samples',
-        batch_size=128
+        batch_size=256
     )
 
-    # network = ConvNN()
-    # network = FullyConnectedNN(500)
-    # model = SimpleExplainableNN()
-    model = GradSimpleExplainableNN()
+    # model = ExplainableNN()   # CAM-based architecture, too difficult for training on default PC
+    # model = SimpleExplainableNN() # CAM-based architecture
+    # model = GradSimpleExplainableNN() # Grad-CAM-based architecture
+    model = RegularizedGradSimpleExplainableNN()    # Grad-CAM-based architecture + mode dropouts
 
+    # loading already saved model
     # model.load_state_dict(torch.load(f'data/models/2021-02-28T21:10:51.448630'))
-    # model.eval()
 
-    train_net(model, data_manager, epochs=1)
+    # training
+    train_net(model, data_manager, epochs=10)
 
-    sample = next(iter(data_manager.get_test_loader(need_shuffle=False, custom_batch_size=1)))
+    model.eval()
+    sample = next(iter(data_manager.get_test_loader(need_shuffle=True, custom_batch_size=1)))
+
+    # only for CAM-based architectures
     # cam = extract_cam(model, 'dropout25', 'linear', sample)
+
+    # only for Grad-CAM-based architectures
     cam = extract_grad_cam(model, sample)
 
     draw_cam(sample, cam)
 
 
 if __name__ == '__main__':
-    print(torch.cuda.is_available())
+    print(f'Is CUDA available: {torch.cuda.is_available()}')
     main()

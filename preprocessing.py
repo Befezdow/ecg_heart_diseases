@@ -124,65 +124,72 @@ def preprocess_data(
         total_row_data_length = 0
         max_row_data_length = -math.inf
         min_row_data_length = math.inf
-        with open(full_output_labels_file, 'a') as labels_file:
-            writer = csv.writer(labels_file)
 
-            augmentation_multipliers = {}
-            max_part = max(class_balance.values())
-            for key, value in class_balance.items():
-                augmentation_multipliers[key] = 1 / (value / max_part)
+        labels_frame = pd.DataFrame(columns=['id', 'label', 'gender', 'age', 'height', 'weight'])
 
-            for index, row in frame.iterrows():
-                row_id = row[id_column_name]
-                row_label = row[label_column_name]
-                row_data, row_additional_data = load_data_file(input_folder, row_id, input_extension)
+        augmentation_multipliers = {}
+        max_part = max(class_balance.values())
+        for key, value in class_balance.items():
+            augmentation_multipliers[key] = 1 / (value / max_part)
 
-                # собираем информацию по таймлайнам датасета
-                row_data_length = row_data.shape[1]
-                total_row_data_length += row_data_length
-                if row_data_length > max_row_data_length:
-                    max_row_data_length = row_data_length
-                elif row_data_length < min_row_data_length:
-                    min_row_data_length = row_data_length
+        for index, row in frame.iterrows():
+            row_id = row[id_column_name]
+            row_label = row[label_column_name]
+            row_data, row_additional_data = load_data_file(input_folder, row_id, input_extension)
 
+            # собираем информацию по таймлайнам датасета
+            row_data_length = row_data.shape[1]
+            total_row_data_length += row_data_length
+            if row_data_length > max_row_data_length:
+                max_row_data_length = row_data_length
+            elif row_data_length < min_row_data_length:
+                min_row_data_length = row_data_length
 
-                samples_to_save = []
-                # если длина таймлайна меньше нужного, то дописываем его слева и справа нулями
-                if row_data_length < adjusted_augmentation_size:
-                    padding_size = adjusted_augmentation_size - row_data_length
-                    left_padding_size = math.floor(padding_size / 2)
-                    right_padding_size = padding_size - left_padding_size
-                    left_padding = np.zeros((12, left_padding_size), dtype=np.float64)
-                    right_padding = np.zeros((12, right_padding_size), dtype=np.float64)
-                    samples_to_save.append(np.hstack((left_padding, row_data, right_padding)))
-                # если длина таймлайна больше нужного, но недостаточна для аугментации то обрезаем его
-                elif not need_augmentation or row_data_length - adjusted_augmentation_size < augmentation_overlong_threshold:
-                    samples_to_save.append(np.delete(row_data, np.s_[adjusted_augmentation_size:], 1))
-                # если длина таймлайна больше нужного, и достаточна для аугментации то аугментируем одну запись в несколько
-                else:
-                    # multiplier = math.ceil((row_data_length - adjusted_augmentation_size) / augmentation_overlong_threshold) + 1
-                    # multiplier = math.ceil(row_data_length / adjusted_augmentation_size) * augmentation_multiplier
+            samples_to_save = []
+            # если длина таймлайна меньше нужного, то дописываем его слева и справа нулями
+            if row_data_length < adjusted_augmentation_size:
+                padding_size = adjusted_augmentation_size - row_data_length
+                left_padding_size = math.floor(padding_size / 2)
+                right_padding_size = padding_size - left_padding_size
+                left_padding = np.zeros((12, left_padding_size), dtype=np.float64)
+                right_padding = np.zeros((12, right_padding_size), dtype=np.float64)
+                samples_to_save.append(np.hstack((left_padding, row_data, right_padding)))
+            # если длина таймлайна больше нужного, но недостаточна для аугментации то обрезаем его
+            elif not need_augmentation or row_data_length - adjusted_augmentation_size < augmentation_overlong_threshold:
+                samples_to_save.append(np.delete(row_data, np.s_[adjusted_augmentation_size:], 1))
+            # если длина таймлайна больше нужного, и достаточна для аугментации то аугментируем одну запись в несколько
+            else:
+                # multiplier = math.ceil((row_data_length - adjusted_augmentation_size) / augmentation_overlong_threshold) + 1
+                # multiplier = math.ceil(row_data_length / adjusted_augmentation_size) * augmentation_multiplier
 
-                    multiplier = round(augmentation_multipliers[row_label] * max_augmentation_multiplier)
-                    for i in range(0, multiplier):
-                        interval_start = random.randint(0, row_data_length - adjusted_augmentation_size)
-                        interval_end = interval_start+adjusted_augmentation_size
-                        samples_to_save.append(row_data[:, interval_start:interval_end])
+                multiplier = round(augmentation_multipliers[row_label] * max_augmentation_multiplier)
+                for i in range(0, multiplier):
+                    interval_start = random.randint(0, row_data_length - adjusted_augmentation_size)
+                    interval_end = interval_start + adjusted_augmentation_size
+                    samples_to_save.append(row_data[:, interval_start:interval_end])
 
-                    # простая аугментация на 1 в 3
-                    # center_part_offset = math.floor((row_data_length - adjusted_augmentation_size) / 2)
-                    # samples_to_save.append(row_data[:, 0:adjusted_augmentation_size])  # левая часть таймлайна
-                    # samples_to_save.append(row_data[:, center_part_offset:center_part_offset+adjusted_augmentation_size])  # центральная часть таймлайна
-                    # samples_to_save.append(row_data[:, -adjusted_augmentation_size:])  # правая часть таймлайна
+                # простая аугментация на 1 в 3
+                # center_part_offset = math.floor((row_data_length - adjusted_augmentation_size) / 2)
+                # samples_to_save.append(row_data[:, 0:adjusted_augmentation_size])  # левая часть таймлайна
+                # samples_to_save.append(row_data[:, center_part_offset:center_part_offset+adjusted_augmentation_size])  # центральная часть таймлайна
+                # samples_to_save.append(row_data[:, -adjusted_augmentation_size:])  # правая часть таймлайна
 
-                for sample in samples_to_save:
-                    writer.writerow([current_output_id, row_label] + row_additional_data)
-                    full_row_data_filename = os.path.join(output_folder, 'samples', f'{current_output_id}.csv')
-                    pd.DataFrame(sample.transpose()).to_csv(full_row_data_filename, header=False, index=False)
-                    current_output_id += 1
+            for sample in samples_to_save:
+                labels_frame.loc[len(labels_frame)] = [current_output_id, row_label] + row_additional_data
+                full_row_data_filename = os.path.join(output_folder, 'samples', f'{current_output_id}.csv')
+                pd.DataFrame(sample.transpose()).fillna(0).to_csv(full_row_data_filename, header=False, index=False)
+                current_output_id += 1
 
-                if index % 100 == 0:
-                    print(f'Progress: {index}/{frame.shape[0]} - {round(index / frame.shape[0] * 100, 2)}%')
+            if index % 100 == 0:
+                print(f'Progress: {index}/{frame.shape[0]} - {round(index / frame.shape[0] * 100, 2)}%')
+
+        # clearing NaN values
+        labels_frame.iloc[:, 2].fillna(0, inplace=True)  # gender
+        labels_frame.iloc[:, 3].fillna(int(round(labels_frame.iloc[:, 3].mean())), inplace=True)  # age
+        labels_frame.iloc[:, 4].fillna(int(round(labels_frame.iloc[:, 4].mean())), inplace=True)  # height
+        labels_frame.iloc[:, 5].fillna(int(round(labels_frame.iloc[:, 5].mean())), inplace=True)  # weight
+
+        labels_frame.to_csv(full_output_labels_file, header=False, index=False)
 
         return total_row_data_length / (index + 1), min_row_data_length, max_row_data_length
 
@@ -315,7 +322,7 @@ def check_records_length(dataset_folder, expected_length):
 
 
 if __name__ == '__main__':
-    # preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 50, 5000, 1000, 3, 'data/samples', 'mat')
+    preprocess_data('data/REFERENCE.csv', 'Recording', 'First_label', 50, 5000, 1000, 3, 'data/samples', 'mat')
 
     train_dataset_data = check_dataset('data/train/labels.csv')
     print('Train result:')
@@ -325,8 +332,8 @@ if __name__ == '__main__':
     print('Test result:')
     print(json.dumps(test_dataset_data, indent=2))
 
-    # print('Splitting train dataset...')
-    # slice_dataset('data/train', 2)
+    print('Splitting train dataset...')
+    slice_dataset('data/train', 2)
 
     train0_dataset_data = check_dataset('data/train/splitted/train0/labels.csv')
     print('Train0 result:')

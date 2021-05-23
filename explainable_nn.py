@@ -140,3 +140,62 @@ class GradSimpleExplainableNN(nn.Module):
     # method for the activation extraction
     def get_activations(self, x1, x2):
         return self._apply_conv(x2)
+
+
+class RegularizedGradSimpleExplainableNN(nn.Module):
+    def __init__(self):
+        super(RegularizedGradSimpleExplainableNN, self).__init__()
+
+        self.conv1 = nn.Conv1d(12, 24, kernel_size=3)
+        self.conv2 = nn.Conv1d(24, 48, kernel_size=3)
+        self.conv3 = nn.Conv1d(48, 96, kernel_size=3)
+
+        self.fc1 = nn.Linear(17668, 1024)
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc3 = nn.Linear(512, 9)
+
+        self.maxPooling = nn.MaxPool1d(kernel_size=3)
+
+        self.batchNorm = nn.BatchNorm1d(num_features=12)
+
+        self.dropout50 = nn.Dropout(0.5)
+        self.dropout25 = nn.Dropout(0.25)
+
+        # placeholder for the gradients
+        self.gradients = None
+
+    def activations_hook(self, grad):
+        self.gradients = grad
+
+    def _apply_conv(self, x):
+        x = self.batchNorm(x)
+        x = self.maxPooling(F.relu(self.conv1(x)))
+        x = self.maxPooling(F.relu(self.conv2(x)))
+        x = self.maxPooling(F.relu(self.conv3(x)))
+        x = self.dropout50(x)
+        return x
+
+    def forward(self, x1, x2):
+        x2 = self._apply_conv(x2)
+
+        # register the hook
+        if not self.training and x2.requires_grad:
+            x2.register_hook(self.activations_hook)
+
+        x2 = x2.view(x2.shape[0], -1)
+        x = torch.cat([x1.float(), x2], 1)
+
+        x = F.relu(self.fc1(x))
+        x = self.dropout50(x)
+        x = F.relu(self.fc2(x))
+        x = self.dropout25(x)
+        x = F.log_softmax(self.fc3(x), dim=1)
+        return x
+
+    # method for the gradient extraction
+    def get_activations_gradient(self):
+        return self.gradients
+
+    # method for the activation extraction
+    def get_activations(self, x1, x2):
+        return self._apply_conv(x2)

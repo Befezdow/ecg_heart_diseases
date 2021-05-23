@@ -55,8 +55,9 @@ def extract_grad_cam(model, sample):
     model.eval()
     out = model(x1, x2)
 
+    predicted_class = out.cpu().detach().squeeze().numpy().argmax()
     # we are going to do the back-propagation with the logit of specific class
-    out[:, y.item()].backward()
+    out[:, predicted_class].backward()
 
     # pull the gradients out of the model
     gradients = model.get_activations_gradient()
