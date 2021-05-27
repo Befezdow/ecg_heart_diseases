@@ -18,7 +18,10 @@ class SaveFeatures:
         self.hook.remove()
 
 
-def extract_cam(model, feature_layer_name, fc_layer_name, sample):
+def extract_cam(model, sample):
+    feature_layer_name = 'dropout25'
+    fc_layer_name = 'linear'
+
     feature_layer = model._modules.get(feature_layer_name)
     activated_features = SaveFeatures(feature_layer)
 
@@ -55,7 +58,14 @@ def extract_grad_cam(model, sample):
     model.eval()
     out = model(x1, x2)
 
-    predicted_class = out.cpu().detach().squeeze().numpy().argmax()
+    pred_probabilities = out.data.squeeze()
+    probs, idx = pred_probabilities.sort(0, True)
+    predicted_class = idx[0].item()
+
+    for i in range(0, 3):
+        line = '{:.3f} -> {}'.format(probs[i], idx[i].item())
+        print(line)
+
     # we are going to do the back-propagation with the logit of specific class
     out[:, predicted_class].backward()
 

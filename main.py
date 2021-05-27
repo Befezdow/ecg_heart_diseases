@@ -3,10 +3,10 @@ import datetime
 from torch.utils.tensorboard import SummaryWriter
 import torch.nn as nn
 import torch.optim as optim
+from sklearn.metrics import confusion_matrix
 
-from cam import extract_cam, draw_cam, extract_grad_cam
-from data_manager import DataManager
-from explainable_nn import ExplainableNN, SimpleExplainableNN, GradSimpleExplainableNN, RegularizedGradSimpleExplainableNN
+from cam import draw_cam
+from config import get_model, get_data_manager, get_cam_extractor, training_epochs_count
 
 
 def log_statistics(writer, epoch_number, index, dataset_size, train_loss, train_accuracy, test_loss, test_accuracy):
@@ -96,36 +96,58 @@ def train_net(model, data_manager, epochs=20):
         torch.save(model.state_dict(), f'models/{current_iso_date}')
 
 
-def main():
-    data_manager = DataManager(
-        train_dir='data/train',
-        test_dir='data/test',
-        labels_file='labels.csv',
-        data_folder='samples',
-        batch_size=256
-    )
-
-    # model = ExplainableNN()   # CAM-based architecture, too difficult for training on default PC
-    # model = SimpleExplainableNN() # CAM-based architecture
-    # model = GradSimpleExplainableNN() # Grad-CAM-based architecture
-    model = RegularizedGradSimpleExplainableNN()    # Grad-CAM-based architecture + mode dropouts
-
-    # loading already saved model
-    # model.load_state_dict(torch.load(f'data/models/2021-02-28T21:10:51.448630'))
-
-    # training
-    train_net(model, data_manager, epochs=10)
+def calculate_confusion_matrix(model, data_manager):
+    if torch.cuda.is_available():
+        model.cuda()
 
     model.eval()
-    sample = next(iter(data_manager.get_test_loader(need_shuffle=True, custom_batch_size=1)))
 
-    # only for CAM-based architectures
-    # cam = extract_cam(model, 'dropout25', 'linear', sample)
+    sources = []
+    predictions = []
+    with torch.no_grad():
+        test_loader = data_manager.get_test_loader(need_shuffle=True)
+        for index, (test_x1, test_x2, test_y) in enumerate(test_loader):
+            if torch.cuda.is_available():
+                test_x1, test_x2, test_y = test_x1.cuda(), test_x2.cuda(), test_y.cuda()
 
-    # only for Grad-CAM-based architectures
-    cam = extract_grad_cam(model, sample)
+            test_out = model(test_x1, test_x2)
+            _, test_pred = torch.max(test_out.data, 1)
 
-    draw_cam(sample, cam)
+            sources += test_y.cpu().numpy().tolist()
+            predictions += test_pred.cpu().numpy().tolist()
+
+    cm = confusion_matrix(sources, predictions)
+
+    print("Confusion matrix:")
+    print(cm)
+
+
+def fetch_and_draw_cam(model, data_manager, records_to_show=10, need_shuffle=True):
+    model.eval()
+
+    extract_func = get_cam_extractor()
+
+    iterator = iter(data_manager.get_test_loader(need_shuffle=need_shuffle, custom_batch_size=1))
+    for i in range(0, records_to_show):
+        sample = next(iterator)
+        (x1, x2, y) = sample
+        print(f'Original class: {y}')
+        cam = extract_func(model, sample)
+        draw_cam(sample, cam)
+
+
+def main():
+    data_manager = get_data_manager()
+    model = get_model()
+
+    # training
+    train_net(model, data_manager, epochs=training_epochs_count)
+
+    # confusion matrix
+    calculate_confusion_matrix(model, data_manager)
+
+    # CAM extraction
+    fetch_and_draw_cam(model, data_manager)
 
 
 if __name__ == '__main__':

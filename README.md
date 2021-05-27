@@ -25,13 +25,12 @@ TODO
 TODO (+ links to snaphots)
 
 ## TODO list
-- integrate config file and argument parser
-- make augmentation after splitting (it saves test dataset from wrong transformations)
-- save snapshots every k epochs
+- integrate configuration through argument parser
 - clear requirements.py
 - describe dataset (size + columns)
 - make installation guide
-- attach links to best model
+- describe models results
+- attach link cloud with models, dataset and logs
+- share logs in tensorboard.dev
 - make train guide
 - make test guide
-- share logs in tensorboard.dev
