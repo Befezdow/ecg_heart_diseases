@@ -12,7 +12,9 @@ TODO
 TODO
 
 Input dataset: gender, age, class1, class2, class3, t1 - t60000 (values of ECG lead graphs, t1-t5000 - first ECG lead, t5001-t10000 - second ECG lead and so on), class1, class2, class3 - the presence of heart disease (three columns, since a combination of diseases is possible).
+
 The dataset contains 12 leads with 5000 values for each.
+
 At the moment, classification is carried out only by class1 (10 classes), i.e. the underlying diagnosis is predicted.
 
 ## How to train
